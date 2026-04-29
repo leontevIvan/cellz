@@ -27,7 +27,7 @@ export class AllyCell {
     this.scene = scene;
     this.x = x; this.y = y;
     this.radius = radius; this.maxRadius = radius;
-    this.hp = 80; this.maxHp = 80;
+    this.hp = 160; this.maxHp = 160;
     this.speed = speed;
     this.rxFactor  = Phaser.Math.FloatBetween(0.90, 1.10);
     this.ryFactor  = Phaser.Math.FloatBetween(0.90, 1.10);

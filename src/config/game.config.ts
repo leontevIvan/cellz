@@ -5,7 +5,7 @@ export const CONFIG = {
   player: {
     radius: 36,
     speed: 160,
-    maxHp: 100,
+    maxHp: 220,
   },
   food: {
     spawnInterval: 1200,

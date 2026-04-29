@@ -383,7 +383,7 @@ export class GameScene extends Phaser.Scene {
           const cd = this.enemyBiteCD.get(e) ?? 0;
           if (cd <= 0) {
             e.isBiting = true;
-            const dmg = e.isBig ? 55 : 22;
+            const dmg = e.isBig ? 28 : 10;
             this.pHp -= dmg;
             this.invincible = e.isBig ? 600 : 1200;
             this.enemyBiteCD.set(e, e.isBig ? BIG_ENEMY_BITE_CD : ENEMY_BITE_CD);

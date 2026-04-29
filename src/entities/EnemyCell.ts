@@ -32,6 +32,11 @@ export class EnemyCell {
   alive: boolean;
   isBiting = false;
 
+  // wander AI
+  wanderVx: number;
+  wanderVy: number;
+  wanderTimer: number;
+
   get color() { return this.palette.body; }
 
   constructor(
@@ -66,8 +71,11 @@ export class EnemyCell {
       oy: Phaser.Math.FloatBetween(-0.52, 0.52),
       vr: Phaser.Math.FloatBetween(0.06, 0.13),
     }));
-    this.finPhase = Phaser.Math.FloatBetween(0, Math.PI * 2);
-    this.alive    = true;
+    this.finPhase    = Phaser.Math.FloatBetween(0, Math.PI * 2);
+    this.alive       = true;
+    this.wanderVx    = this.vx;
+    this.wanderVy    = this.vy;
+    this.wanderTimer = Phaser.Math.FloatBetween(0.5, 3.0);
   }
 
   takeDamage(amount: number) {
@@ -91,19 +99,43 @@ export class EnemyCell {
     this.bp3      += dt * 0.70;
     this.finPhase += dt * 2.8;
 
-    if (this.isBig && targetX !== undefined && targetY !== undefined) {
-      // big enemy slowly hunts the player
-      const dx = targetX - this.x;
-      const dy = targetY - this.y;
-      const d = Math.hypot(dx, dy) || 1;
-      this.vx = Phaser.Math.Linear(this.vx, (dx / d) * this.speed, 0.022);
-      this.vy = Phaser.Math.Linear(this.vy, (dy / d) * this.speed, 0.022);
+    // pick a new random wander direction periodically
+    this.wanderTimer -= dt;
+    if (this.wanderTimer <= 0) {
+      const a         = Math.random() * Math.PI * 2;
+      this.wanderVx    = Math.cos(a) * this.speed;
+      this.wanderVy    = Math.sin(a) * this.speed;
+      this.wanderTimer = Phaser.Math.FloatBetween(2.5, 5.5);
     }
+
+    let tvx = this.wanderVx;
+    let tvy = this.wanderVy;
+
+    // big enemies slowly home in on player only when within range
+    if (this.isBig && targetX !== undefined && targetY !== undefined) {
+      const dist = Math.hypot(targetX - this.x, targetY - this.y);
+      if (dist < 420) {
+        const d = dist || 1;
+        tvx = ((targetX - this.x) / d) * this.speed;
+        tvy = ((targetY - this.y) / d) * this.speed;
+      }
+    }
+
+    // smooth slow turn — big enemies heavier, turn at ~0.7 rad/s half-life, normals at ~1.5
+    const turn = this.isBig ? 0.70 : 1.50;
+    this.vx = Phaser.Math.Linear(this.vx, tvx, Math.min(1, turn * dt));
+    this.vy = Phaser.Math.Linear(this.vy, tvy, Math.min(1, turn * dt));
 
     this.x += this.vx * dt;
     this.y += this.vy * dt;
-    if (this.x < this.radius || this.x > width  - this.radius) this.vx *= -1;
-    if (this.y < this.radius || this.y > height - this.radius) this.vy *= -1;
+
+    // soft wall bounce: reflect velocity and wander target together
+    if (this.x < this.radius || this.x > width - this.radius) {
+      this.vx *= -0.8; this.wanderVx = this.vx;
+    }
+    if (this.y < this.radius || this.y > height - this.radius) {
+      this.vy *= -0.8; this.wanderVy = this.vy;
+    }
     this.x = Phaser.Math.Clamp(this.x, this.radius, width  - this.radius);
     this.y = Phaser.Math.Clamp(this.y, this.radius, height - this.radius);
   }

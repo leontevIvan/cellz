@@ -111,18 +111,19 @@ export class EnemyCell {
     let tvx = this.wanderVx;
     let tvy = this.wanderVy;
 
-    // big enemies slowly home in on player only when within range
-    if (this.isBig && targetX !== undefined && targetY !== undefined) {
+    // notice nearest target only within a short radius
+    const aggroRange = this.isBig ? 210 : 150;
+    if (targetX !== undefined && targetY !== undefined) {
       const dist = Math.hypot(targetX - this.x, targetY - this.y);
-      if (dist < 420) {
+      if (dist < aggroRange) {
         const d = dist || 1;
         tvx = ((targetX - this.x) / d) * this.speed;
         tvy = ((targetY - this.y) / d) * this.speed;
       }
     }
 
-    // smooth slow turn — big enemies heavier, turn at ~0.7 rad/s half-life, normals at ~1.5
-    const turn = this.isBig ? 0.70 : 1.50;
+    // very slow turning — big enemies lumbering, normals sluggish
+    const turn = this.isBig ? 0.38 : 0.75;
     this.vx = Phaser.Math.Linear(this.vx, tvx, Math.min(1, turn * dt));
     this.vy = Phaser.Math.Linear(this.vy, tvy, Math.min(1, turn * dt));
 

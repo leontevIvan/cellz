@@ -16,13 +16,13 @@ export const CONFIG = {
     spawnInterval: 3500,
     count: 5,
     radius: 28,
-    speed: 42,
+    speed: 28,
   },
   bigEnemy: {
     spawnInterval: 14000,
     count: 2,
     radius: 88,
-    speed: 26,
+    speed: 16,
   },
   ally: {
     count: 2,

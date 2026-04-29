@@ -303,7 +303,15 @@ export class GameScene extends Phaser.Scene {
 
     for (const e of this.enemies) {
       e.isBiting = false;
-      e.update(delta, W, H, this.px, this.py);
+      // track the closest living target (player or ally) within aggro range
+      let nearX = this.px, nearY = this.py;
+      let nearDist = Math.hypot(this.px - e.x, this.py - e.y);
+      for (const a of this.allies) {
+        if (!a.alive) continue;
+        const ad = Math.hypot(a.x - e.x, a.y - e.y);
+        if (ad < nearDist) { nearDist = ad; nearX = a.x; nearY = a.y; }
+      }
+      e.update(delta, W, H, nearX, nearY);
     }
 
     // enemies eat food
@@ -347,10 +355,11 @@ export class GameScene extends Phaser.Scene {
       const dist = Math.hypot(this.px - e.x, this.py - e.y);
       if (dist >= this.pRadius + e.radius) continue;
 
-      // player bites enemy
+      // player bites enemy — damage scales with player growth
       if (this.pRadius >= e.radius * 0.70) {
         this.pBiting = true;
-        e.takeDamage(BITE_DPS * dt * (this.pRadius / e.radius));
+        const sizeBonus = Math.sqrt(this.pRadius / CONFIG.player.radius);
+        e.takeDamage(BITE_DPS * dt * (this.pRadius / e.radius) * sizeBonus);
         if (!e.alive) {
           this.score += Math.round(e.maxHp * (e.isBig ? 8 : 3));
           this.growPlayer(e.maxRadius * (e.isBig ? 0.25 : 0.15));

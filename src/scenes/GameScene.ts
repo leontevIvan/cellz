@@ -145,9 +145,9 @@ export class GameScene extends Phaser.Scene {
 
   private updatePlayer(delta: number, W: number, H: number) {
     const dt = delta / 1000;
-    this.pBp1      += dt * 0.30;
-    this.pBp2      += dt * 0.46;
-    this.pBp3      += dt * 0.68;
+    this.pBp1      += dt * 2.20;
+    this.pBp2      += dt * 1.55;
+    this.pBp3      += dt * 3.00;
     this.pFinPhase += dt * 2.6;
 
     if (this.pointer && this.pointer.isDown) {

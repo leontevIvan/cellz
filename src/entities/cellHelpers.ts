@@ -15,10 +15,15 @@ export function fillBlob(
   g.beginPath();
   for (let i = 0; i <= n; i++) {
     const a = (i / n) * PI2;
+    // traveling waves: some harmonics go clockwise (-p), others counter (+p)
+    // creates the rippling, flowing jellyfish-membrane effect
     const d = 1
-      + 0.13 * Math.sin(a * 2 + p1)
-      + 0.09 * Math.sin(a * 3 + p2)
-      + 0.06 * Math.cos(a * 5 + p3);
+      + 0.17 * Math.sin(a * 2 - p1)           // main wave, travels CW
+      + 0.11 * Math.sin(a * 3 + p2 * 0.8)     // secondary, CCW
+      + 0.08 * Math.cos(a * 4 - p3)           // tertiary CW
+      + 0.05 * Math.sin(a * 5 + p1 * 0.5)     // detail ripple
+      + 0.04 * Math.sin(a      + p2 * 0.3)    // slow asymmetric lean
+      + 0.03 * Math.cos(a * 6 - p3 * 0.6);    // fine fringe
     const bx = Math.cos(a) * rx * d;
     const by = Math.sin(a) * ry * d;
     const x = cx + bx * cosR - by * sinR;
@@ -43,9 +48,12 @@ export function strokeBlob(
   for (let i = 0; i <= n; i++) {
     const a = (i / n) * PI2;
     const d = 1
-      + 0.13 * Math.sin(a * 2 + p1)
-      + 0.09 * Math.sin(a * 3 + p2)
-      + 0.06 * Math.cos(a * 5 + p3);
+      + 0.17 * Math.sin(a * 2 - p1)
+      + 0.11 * Math.sin(a * 3 + p2 * 0.8)
+      + 0.08 * Math.cos(a * 4 - p3)
+      + 0.05 * Math.sin(a * 5 + p1 * 0.5)
+      + 0.04 * Math.sin(a      + p2 * 0.3)
+      + 0.03 * Math.cos(a * 6 - p3 * 0.6);
     const bx = Math.cos(a) * rx * d;
     const by = Math.sin(a) * ry * d;
     const x = cx + bx * cosR - by * sinR;

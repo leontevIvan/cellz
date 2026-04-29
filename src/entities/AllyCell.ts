@@ -71,9 +71,9 @@ export class AllyCell {
     playerBiting: boolean,
   ) {
     const dt = delta / 1000;
-    this.bp1      += dt * 0.30;
-    this.bp2      += dt * 0.46;
-    this.bp3      += dt * 0.68;
+    this.bp1      += dt * 2.20;
+    this.bp2      += dt * 1.55;
+    this.bp3      += dt * 3.00;
     this.finPhase += dt * 2.6;
 
     // passive HP regen

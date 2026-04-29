@@ -94,9 +94,9 @@ export class EnemyCell {
 
   update(delta: number, width: number, height: number, targetX?: number, targetY?: number) {
     const dt = delta / 1000;
-    this.bp1      += dt * 0.32;
-    this.bp2      += dt * 0.50;
-    this.bp3      += dt * 0.70;
+    this.bp1      += dt * 2.20;
+    this.bp2      += dt * 1.55;
+    this.bp3      += dt * 3.00;
     this.finPhase += dt * 2.8;
 
     // pick a new random wander direction periodically

@@ -600,38 +600,48 @@ export class GameScene extends Phaser.Scene {
     const flicker = this.invincible > 0 && Math.floor(this.invincible / 80) % 2 === 0;
     if (flicker) return;
 
-    const rx = r * this.pRxF;
-    const ry = r * this.pRyF;
     const p1 = this.pBp1, p2 = this.pBp2, p3 = this.pBp3;
+
+    // area-conserving dynamic deformation along facing direction
+    const spd     = Math.hypot(this.pvx, this.pvy);
+    const sf      = Math.min(1, spd / (CONFIG.player.speed * 1.1));
+    const pulse   = 1 + 0.09 * Math.sin(this.pFinPhase * 0.38);
+    const stretch = (1 + 0.28 * sf) * pulse;
+    const rx  = r * this.pRxF * stretch;
+    const ry  = r * this.pRyF / stretch;
+    const cosD = Math.cos(dir);
+    const sinD = Math.sin(dir);
 
     drawFlagellum(g, this.px, this.py, r, dir, this.pFinPhase, P_MEMBRANE);
 
     g.fillStyle(P_BODY, 0.11);
-    fillBlob(g, this.px, this.py, rx * 1.40, ry * 1.40, p1, p2, p3);
+    fillBlob(g, this.px, this.py, rx * 1.40, ry * 1.40, p1, p2, p3, 28, dir);
 
     g.fillStyle(P_BODY, 0.54);
-    fillBlob(g, this.px, this.py, rx, ry, p1, p2, p3);
+    fillBlob(g, this.px, this.py, rx, ry, p1, p2, p3, 28, dir);
 
     g.fillStyle(P_BODY, 0.20);
-    fillBlob(g, this.px, this.py, rx * 0.70, ry * 0.70, p1 + 0.5, p2 + 0.4, p3 - 0.3);
+    fillBlob(g, this.px, this.py, rx * 0.70, ry * 0.70, p1 + 0.5, p2 + 0.4, p3 - 0.3, 28, dir);
 
     for (const v of this.pVac) {
+      const vx = this.px + (v.ox * cosD - v.oy * sinD) * r * 0.72;
+      const vy = this.py + (v.ox * sinD + v.oy * cosD) * r * 0.72;
       g.fillStyle(P_NUCLEUS, 0.16);
-      g.fillCircle(this.px + v.ox * r * 0.72, this.py + v.oy * r * 0.72, v.vr * r);
+      g.fillCircle(vx, vy, v.vr * r);
       g.lineStyle(0.5, P_MEMBRANE, 0.22);
-      g.strokeCircle(this.px + v.ox * r * 0.72, this.py + v.oy * r * 0.72, v.vr * r);
+      g.strokeCircle(vx, vy, v.vr * r);
     }
 
-    const nx = this.px + this.pNox * r * 0.36;
-    const ny = this.py + this.pNoy * r * 0.36;
-    const nr = r * 0.31;
+    const nr  = r * 0.31;
+    const nx  = this.px + (this.pNox * cosD - this.pNoy * sinD) * r * 0.36;
+    const ny  = this.py + (this.pNox * sinD + this.pNoy * cosD) * r * 0.36;
     g.fillStyle(P_NUCLEUS, 0.66);
     fillBlob(g, nx, ny, nr, nr * 0.88, p1 * 0.6, p2 * 0.7, p3 * 0.5);
     g.lineStyle(0.8, P_MEMBRANE, 0.38);
     strokeBlob(g, nx, ny, nr, nr * 0.88, p1 * 0.6, p2 * 0.7, p3 * 0.5);
 
     g.lineStyle(Math.max(1.2, r * 0.045), P_MEMBRANE, 0.78);
-    strokeBlob(g, this.px, this.py, rx, ry, p1, p2, p3);
+    strokeBlob(g, this.px, this.py, rx, ry, p1, p2, p3, 28, dir);
 
     g.fillStyle(P_MEMBRANE, 0.09);
     g.fillEllipse(this.px - r * 0.18, this.py - r * 0.22, r * 0.50, r * 0.30);

@@ -2,14 +2,16 @@ import Phaser from 'phaser';
 
 const PI2 = Math.PI * 2;
 
-/** Fill a deformed (organic) ellipse */
+/** Fill a deformed (organic) ellipse, optionally rotated by `rot` radians */
 export function fillBlob(
   g: Phaser.GameObjects.Graphics,
   cx: number, cy: number,
   rx: number, ry: number,
   p1: number, p2: number, p3: number,
-  n = 28,
+  n = 28, rot = 0,
 ) {
+  const cosR = Math.cos(rot);
+  const sinR = Math.sin(rot);
   g.beginPath();
   for (let i = 0; i <= n; i++) {
     const a = (i / n) * PI2;
@@ -17,22 +19,26 @@ export function fillBlob(
       + 0.13 * Math.sin(a * 2 + p1)
       + 0.09 * Math.sin(a * 3 + p2)
       + 0.06 * Math.cos(a * 5 + p3);
-    const x = cx + Math.cos(a) * rx * d;
-    const y = cy + Math.sin(a) * ry * d;
+    const bx = Math.cos(a) * rx * d;
+    const by = Math.sin(a) * ry * d;
+    const x = cx + bx * cosR - by * sinR;
+    const y = cy + bx * sinR + by * cosR;
     i === 0 ? g.moveTo(x, y) : g.lineTo(x, y);
   }
   g.closePath();
   g.fillPath();
 }
 
-/** Stroke a deformed (organic) ellipse */
+/** Stroke a deformed (organic) ellipse, optionally rotated by `rot` radians */
 export function strokeBlob(
   g: Phaser.GameObjects.Graphics,
   cx: number, cy: number,
   rx: number, ry: number,
   p1: number, p2: number, p3: number,
-  n = 28,
+  n = 28, rot = 0,
 ) {
+  const cosR = Math.cos(rot);
+  const sinR = Math.sin(rot);
   g.beginPath();
   for (let i = 0; i <= n; i++) {
     const a = (i / n) * PI2;
@@ -40,8 +46,10 @@ export function strokeBlob(
       + 0.13 * Math.sin(a * 2 + p1)
       + 0.09 * Math.sin(a * 3 + p2)
       + 0.06 * Math.cos(a * 5 + p3);
-    const x = cx + Math.cos(a) * rx * d;
-    const y = cy + Math.sin(a) * ry * d;
+    const bx = Math.cos(a) * rx * d;
+    const by = Math.sin(a) * ry * d;
+    const x = cx + bx * cosR - by * sinR;
+    const y = cy + bx * sinR + by * cosR;
     i === 0 ? g.moveTo(x, y) : g.lineTo(x, y);
   }
   g.closePath();
@@ -112,21 +120,17 @@ export function drawMandibles(
   for (const side of [-1, 1] as const) {
     const s = side as number;
 
-    // base — wide attachment to cell
     const b1x = sx + perpX * (r * 0.50 + openAdd) * s;
     const b1y = sy + perpY * (r * 0.50 + openAdd) * s;
     const b2x = sx + perpX * (r * 0.17 + openAdd * 0.22) * s;
     const b2y = sy + perpY * (r * 0.17 + openAdd * 0.22) * s;
 
-    // outer mid (mandible bulges outward)
     const mx = sx + fwdX * r * 0.28 + perpX * (r * 0.46 + openAdd * 0.55) * s;
     const my = sy + fwdY * r * 0.28 + perpY * (r * 0.46 + openAdd * 0.55) * s;
 
-    // sharp tip — nearly at centreline
     const tx = sx + fwdX * r * 0.72 + perpX * r * 0.05 * s;
     const ty = sy + fwdY * r * 0.72 + perpY * r * 0.05 * s;
 
-    // shadow
     g.fillStyle(0x000000, 0.18);
     g.beginPath();
     g.moveTo(b1x + 1, b1y + 2);
@@ -136,7 +140,6 @@ export function drawMandibles(
     g.closePath();
     g.fillPath();
 
-    // main fill
     g.fillStyle(bodyColor, 0.94);
     g.beginPath();
     g.moveTo(b1x, b1y);
@@ -146,7 +149,6 @@ export function drawMandibles(
     g.closePath();
     g.fillPath();
 
-    // highlight on outer face
     g.fillStyle(membraneColor, 0.32);
     g.beginPath();
     g.moveTo(b1x, b1y);
@@ -155,7 +157,6 @@ export function drawMandibles(
     g.closePath();
     g.fillPath();
 
-    // sharp outline
     g.lineStyle(1.5, membraneColor, 0.78);
     g.beginPath();
     g.moveTo(b1x, b1y);

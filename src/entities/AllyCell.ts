@@ -135,9 +135,17 @@ export class AllyCell {
   draw(gfx: Phaser.GameObjects.Graphics) {
     const r   = this.radius;
     const dir = Math.atan2(this.vy, this.vx) || 0;
-    const rx  = r * this.rxFactor;
-    const ry  = r * this.ryFactor;
     const p1  = this.bp1, p2 = this.bp2, p3 = this.bp3;
+
+    // area-conserving dynamic deformation
+    const spd     = Math.hypot(this.vx, this.vy);
+    const sf      = Math.min(1, spd / (this.speed * 1.1));
+    const pulse   = 1 + 0.09 * Math.sin(this.finPhase * 0.38);
+    const stretch = (1 + 0.28 * sf) * pulse;
+    const rx  = r * this.rxFactor * stretch;
+    const ry  = r * this.ryFactor / stretch;
+    const cosD = Math.cos(dir);
+    const sinD = Math.sin(dir);
 
     // cooperating glow ring
     if (this.cooperating) {
@@ -148,17 +156,17 @@ export class AllyCell {
     drawFlagellum(gfx, this.x, this.y, r, dir, this.finPhase, MEMBRANE);
 
     gfx.fillStyle(BODY, 0.11);
-    fillBlob(gfx, this.x, this.y, rx * 1.40, ry * 1.40, p1, p2, p3);
+    fillBlob(gfx, this.x, this.y, rx * 1.40, ry * 1.40, p1, p2, p3, 28, dir);
 
     gfx.fillStyle(BODY, 0.52);
-    fillBlob(gfx, this.x, this.y, rx, ry, p1, p2, p3);
+    fillBlob(gfx, this.x, this.y, rx, ry, p1, p2, p3, 28, dir);
 
     gfx.fillStyle(BODY, 0.18);
-    fillBlob(gfx, this.x, this.y, rx * 0.70, ry * 0.70, p1 + 0.5, p2 + 0.4, p3 - 0.3);
+    fillBlob(gfx, this.x, this.y, rx * 0.70, ry * 0.70, p1 + 0.5, p2 + 0.4, p3 - 0.3, 28, dir);
 
     for (const v of this.vacuoles) {
-      const vx = this.x + v.ox * r * 0.72;
-      const vy = this.y + v.oy * r * 0.72;
+      const vx = this.x + (v.ox * cosD - v.oy * sinD) * r * 0.72;
+      const vy = this.y + (v.ox * sinD + v.oy * cosD) * r * 0.72;
       const vr = v.vr * r;
       gfx.fillStyle(NUCLEUS, 0.18);
       gfx.fillCircle(vx, vy, vr);
@@ -166,16 +174,16 @@ export class AllyCell {
       gfx.strokeCircle(vx, vy, vr);
     }
 
-    const nx = this.x + this.nucleusOx * r * 0.36;
-    const ny = this.y + this.nucleusOy * r * 0.36;
-    const nr = r * 0.31;
+    const nr  = r * 0.31;
+    const nx  = this.x + (this.nucleusOx * cosD - this.nucleusOy * sinD) * r * 0.36;
+    const ny  = this.y + (this.nucleusOx * sinD + this.nucleusOy * cosD) * r * 0.36;
     gfx.fillStyle(NUCLEUS, 0.68);
     fillBlob(gfx, nx, ny, nr, nr * 0.88, p1 * 0.6, p2 * 0.7, p3 * 0.5);
     gfx.lineStyle(0.8, MEMBRANE, 0.40);
     strokeBlob(gfx, nx, ny, nr, nr * 0.88, p1 * 0.6, p2 * 0.7, p3 * 0.5);
 
     gfx.lineStyle(Math.max(1.2, r * 0.045), MEMBRANE, 0.78);
-    strokeBlob(gfx, this.x, this.y, rx, ry, p1, p2, p3);
+    strokeBlob(gfx, this.x, this.y, rx, ry, p1, p2, p3, 28, dir);
 
     gfx.fillStyle(MEMBRANE, 0.10);
     gfx.fillEllipse(this.x - r * 0.18, this.y - r * 0.22, r * 0.50, r * 0.30);

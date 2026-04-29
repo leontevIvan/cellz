@@ -144,10 +144,19 @@ export class EnemyCell {
   draw(gfx: Phaser.GameObjects.Graphics) {
     const r   = this.radius;
     const dir = Math.atan2(this.vy, this.vx);
-    const rx  = r * this.rxFactor;
-    const ry  = r * this.ryFactor;
     const p   = this.palette;
     const { bp1: p1, bp2: p2, bp3: p3 } = this;
+
+    // area-conserving dynamic deformation:
+    // stretch along movement direction, compress perpendicular; pulse when idle
+    const spd     = Math.hypot(this.vx, this.vy);
+    const sf      = Math.min(1, spd / (this.speed * 1.1));
+    const pulse   = 1 + 0.09 * Math.sin(this.finPhase * 0.38);
+    const stretch = (1 + 0.28 * sf) * pulse;
+    const rx  = r * this.rxFactor * stretch;
+    const ry  = r * this.ryFactor / stretch;
+    const cosD = Math.cos(dir);
+    const sinD = Math.sin(dir);
 
     // big enemies get a menacing outer ring
     if (this.isBig) {
@@ -157,22 +166,21 @@ export class EnemyCell {
 
     drawFlagellum(gfx, this.x, this.y, r, dir, this.finPhase, p.membrane);
 
-    // body opacity: big enemies more solid
-    const bodyAlpha = this.isBig ? 0.70 : 0.52;
+    const bodyAlpha  = this.isBig ? 0.70 : 0.52;
     const innerAlpha = this.isBig ? 0.28 : 0.20;
 
     gfx.fillStyle(p.body, this.isBig ? 0.14 : 0.10);
-    fillBlob(gfx, this.x, this.y, rx * 1.40, ry * 1.40, p1, p2, p3);
+    fillBlob(gfx, this.x, this.y, rx * 1.40, ry * 1.40, p1, p2, p3, 28, dir);
 
     gfx.fillStyle(p.body, bodyAlpha);
-    fillBlob(gfx, this.x, this.y, rx, ry, p1, p2, p3);
+    fillBlob(gfx, this.x, this.y, rx, ry, p1, p2, p3, 28, dir);
 
     gfx.fillStyle(p.body, innerAlpha);
-    fillBlob(gfx, this.x, this.y, rx * 0.70, ry * 0.70, p1 + 0.5, p2 + 0.4, p3 - 0.3);
+    fillBlob(gfx, this.x, this.y, rx * 0.70, ry * 0.70, p1 + 0.5, p2 + 0.4, p3 - 0.3, 28, dir);
 
     for (const v of this.vacuoles) {
-      const vx = this.x + v.ox * r * 0.72;
-      const vy = this.y + v.oy * r * 0.72;
+      const vx = this.x + (v.ox * cosD - v.oy * sinD) * r * 0.72;
+      const vy = this.y + (v.ox * sinD + v.oy * cosD) * r * 0.72;
       const vr = v.vr * r;
       gfx.fillStyle(p.nucleus, 0.20);
       gfx.fillCircle(vx, vy, vr);
@@ -180,17 +188,16 @@ export class EnemyCell {
       gfx.strokeCircle(vx, vy, vr);
     }
 
-    // nucleus (bigger on big enemies)
     const nr = r * (this.isBig ? 0.38 : 0.31);
-    const nx = this.x + this.nucleusOx * r * 0.36;
-    const ny = this.y + this.nucleusOy * r * 0.36;
+    const nx = this.x + (this.nucleusOx * cosD - this.nucleusOy * sinD) * r * 0.36;
+    const ny = this.y + (this.nucleusOx * sinD + this.nucleusOy * cosD) * r * 0.36;
     gfx.fillStyle(p.nucleus, this.isBig ? 0.82 : 0.65);
     fillBlob(gfx, nx, ny, nr, nr * 0.88, p1 * 0.6, p2 * 0.7, p3 * 0.5);
     gfx.lineStyle(0.8, p.membrane, 0.42);
     strokeBlob(gfx, nx, ny, nr, nr * 0.88, p1 * 0.6, p2 * 0.7, p3 * 0.5);
 
     gfx.lineStyle(Math.max(1.2, r * (this.isBig ? 0.055 : 0.045)), p.membrane, this.isBig ? 0.85 : 0.75);
-    strokeBlob(gfx, this.x, this.y, rx, ry, p1, p2, p3);
+    strokeBlob(gfx, this.x, this.y, rx, ry, p1, p2, p3, 28, dir);
 
     gfx.fillStyle(p.membrane, 0.10);
     gfx.fillEllipse(this.x - r * 0.18, this.y - r * 0.22, r * 0.52, r * 0.30);

@@ -2,10 +2,10 @@ import Phaser from 'phaser';
 import { fillBlob, strokeBlob, drawFlagellum, drawBioEye, drawMandibles } from './cellHelpers';
 import type { EnemyCell } from './EnemyCell';
 
-// cyan-teal — clearly distinct from player (green) and enemies (colored)
-const BODY     = 0x28c8b8;
-const MEMBRANE = 0x50e8d8;
-const NUCLEUS  = 0x0a5850;
+// same green palette as player
+const BODY     = 0x50b882;
+const MEMBRANE = 0x7ad8a8;
+const NUCLEUS  = 0x1a6040;
 
 export class AllyCell {
   scene: Phaser.Scene;
@@ -188,7 +188,7 @@ export class AllyCell {
     gfx.fillStyle(0x0a2820, 1);
     gfx.fillRoundedRect(bx, by, bw, bh, 2);
     const hf = this.hp / this.maxHp;
-    gfx.fillStyle(hf > 0.5 ? 0x38d8b8 : hf > 0.25 ? 0xe0c830 : 0xe05030, 1);
+    gfx.fillStyle(hf > 0.5 ? 0x44dd88 : hf > 0.25 ? 0xe0c030 : 0xe04030, 1);
     gfx.fillRoundedRect(bx, by, bw * hf, bh, 2);
 
     const eyeR = r * 0.22;

@@ -63,6 +63,8 @@ export class GameScene extends Phaser.Scene {
 
   // input
   private pointer: Phaser.Input.Pointer | null = null;
+  private pCursorX = GAME_WIDTH / 2;
+  private pCursorY = GAME_HEIGHT / 2;
 
   // HUD
   private scoreText!: Phaser.GameObjects.Text;
@@ -106,9 +108,16 @@ export class GameScene extends Phaser.Scene {
     this.spawnInitialBubbles(W, H);
     this.spawnInitialAllies(W, H);
 
-    this.input.on('pointerdown', (p: Phaser.Input.Pointer) => { this.pointer = p; });
-    this.input.on('pointerup',   () => { this.pointer = null; });
-    this.input.on('pointermove', (p: Phaser.Input.Pointer) => { if (this.pointer) this.pointer = p; });
+    this.pCursorX = W / 2; this.pCursorY = H / 2;
+    this.input.on('pointerdown', (p: Phaser.Input.Pointer) => {
+      this.pointer  = p;
+      this.pCursorX = p.x; this.pCursorY = p.y;
+    });
+    this.input.on('pointerup', () => { this.pointer = null; });
+    this.input.on('pointermove', (p: Phaser.Input.Pointer) => {
+      this.pCursorX = p.x; this.pCursorY = p.y;
+      if (this.pointer) this.pointer = p;
+    });
   }
 
   update(_time: number, delta: number) {
@@ -158,7 +167,11 @@ export class GameScene extends Phaser.Scene {
     this.py += this.pvy * dt;
     this.px = Phaser.Math.Clamp(this.px, this.pRadius, W - this.pRadius);
     this.py = Phaser.Math.Clamp(this.py, this.pRadius, H - this.pRadius);
-    if (Math.hypot(this.pvx, this.pvy) > 5) this.pDir = Math.atan2(this.pvy, this.pvx);
+
+    // rotate cell toward cursor, not movement direction
+    const targetDir = Math.atan2(this.pCursorY - this.py, this.pCursorX - this.px);
+    const dAngle    = Phaser.Math.Angle.Wrap(targetDir - this.pDir);
+    this.pDir       = Phaser.Math.Angle.Wrap(this.pDir + dAngle * Math.min(1, 7 * dt));
   }
 
   private growPlayer(amount: number) {
@@ -563,9 +576,9 @@ export class GameScene extends Phaser.Scene {
     for (let i = 0; i < CONFIG.ally.count; i++) {
       const ax = W - 16 - bw + i * 16;
       const ay = by + bh + 6;
-      g.fillStyle(i < aliveAllies ? 0x38d8b8 : 0x1a3830, 1);
+      g.fillStyle(i < aliveAllies ? 0x44dd88 : 0x1a3020, 1);
       g.fillCircle(ax, ay, 5);
-      g.lineStyle(1, 0x50e8d0, 0.50);
+      g.lineStyle(1, 0x7ad8a8, 0.50);
       g.strokeCircle(ax, ay, 5);
     }
   }

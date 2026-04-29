@@ -476,146 +476,139 @@ export class GameScene extends Phaser.Scene {
   // ── Ocean ───────────────────────────────────────────────────────────────────
 
   private drawOcean(g: Phaser.GameObjects.Graphics, W: number, H: number) {
-    // ── base depth gradient ──────────────────────────────────────────────
-    g.fillStyle(0x041828, 1);    g.fillRect(0, 0,        W, H);
-    g.fillStyle(0x0d3a6a, 0.92); g.fillRect(0, 0,        W, H * 0.55);
-    g.fillStyle(0x1a5888, 0.50); g.fillRect(0, 0,        W, H * 0.28);
-    g.fillStyle(0x2a88c8, 0.28); g.fillRect(0, 0,        W, H * 0.10);
-    g.fillStyle(0x020c14, 0.55); g.fillRect(0, H * 0.60, W, H * 0.40);
+    // restore original bright palette
+    g.fillStyle(0x0d3a6a, 1);    g.fillRect(0, 0,        W, H);
+    g.fillStyle(0x2a88c8, 0.55); g.fillRect(0, 0,        W, H * 0.18);
+    g.fillStyle(0x1a60a0, 0.42); g.fillRect(0, 0,        W, H * 0.42);
+    g.fillStyle(0x082848, 0.28); g.fillRect(0, H * 0.58, W, H * 0.42);
+    g.fillStyle(0x041828, 0.32); g.fillRect(0, H * 0.82, W, H * 0.18);
 
     const t = this.time.now / 1000;
 
-    // ── god rays ─────────────────────────────────────────────────────────
+    // god rays (thin lines — behind everything)
     this.drawGodRays(g, W, H, t);
 
-    // ── water current bands ──────────────────────────────────────────────
+    // water current bands (original, unchanged)
     const wt = t / 1.8;
-    for (let i = 0; i < 6; i++) {
-      const baseY = H * (0.08 + i * 0.145);
-      const amp   = (8 + 5 * Math.sin(i * 1.8)) * (H / 800);
-      const thick = (18 + 8 * Math.abs(Math.sin(i * 2.3))) * (H / 800);
-      const alpha = 0.030 + 0.018 * Math.abs(Math.sin(i * 0.9 + wt * 0.3));
-      g.fillStyle(0x4aa8d8, alpha);
+    for (let i = 0; i < 7; i++) {
+      const baseY = H * (0.06 + i * 0.135);
+      const amp   = (10 + 6 * Math.sin(i * 1.8)) * (H / 800);
+      const spd   = 0.55 + i * 0.10;
+      const phase = i * 1.05;
+      const thick = (22 + 10 * Math.abs(Math.sin(i * 2.3))) * (H / 800);
+      const alpha = 0.055 + 0.025 * Math.abs(Math.sin(i * 0.9 + wt * 0.3));
+      g.fillStyle(0x5ab8e8, alpha);
       g.beginPath();
-      for (let xi = 0; xi <= W + 12; xi += 12) {
-        const y = baseY + amp * Math.sin((xi / W) * Math.PI * 3.5 + wt * (0.5 + i * 0.1) + i * 1.05);
+      for (let xi = 0; xi <= W + 12; xi += 10) {
+        const y = baseY + amp * Math.sin((xi / W) * Math.PI * 3.5 + wt * spd + phase);
         xi === 0 ? g.moveTo(xi, y) : g.lineTo(xi, y);
       }
-      for (let xi = W; xi >= 0; xi -= 12) {
-        const y = baseY + thick + amp * Math.sin((xi / W) * Math.PI * 3.5 + wt * (0.5 + i * 0.1) + i * 1.05 + 0.35);
+      for (let xi = W; xi >= 0; xi -= 10) {
+        const y = baseY + thick + amp * Math.sin((xi / W) * Math.PI * 3.5 + wt * spd + phase + 0.35);
         g.lineTo(xi, y);
       }
       g.closePath(); g.fillPath();
     }
 
-    // ── caustic network ──────────────────────────────────────────────────
+    // caustic light patches (fill only, no outlines)
     this.drawCaustics(g, W, H, t);
 
-    // ── surface glow strip ───────────────────────────────────────────────
-    g.fillStyle(0x60c8ff, 0.07); g.fillRect(0, 0, W, H * 0.04);
-    g.fillStyle(0x90d8ff, 0.04); g.fillRect(0, 0, W, H * 0.015);
-
-    // ── edge + seabed vignette ────────────────────────────────────────────
-    g.fillStyle(0x000000, 0.14); g.fillRect(0,          0, W * 0.055, H);
-    g.fillStyle(0x000000, 0.14); g.fillRect(W * 0.945,  0, W * 0.055, H);
-    g.fillStyle(0x081420, 0.65); g.fillRect(0, H * 0.92, W, H * 0.08);
-    g.fillStyle(0x102030, 0.38); g.fillRect(0, H * 0.90, W, H * 0.04);
+    // edge + seabed vignette (original)
+    g.fillStyle(0x000000, 0.10); g.fillRect(0,         0, W * 0.05, H);
+    g.fillStyle(0x000000, 0.10); g.fillRect(W * 0.95,  0, W * 0.05, H);
+    g.fillStyle(0x1a2830, 0.60); g.fillRect(0, H * 0.93, W, H * 0.07);
+    g.fillStyle(0x283840, 0.35); g.fillRect(0, H * 0.91, W, H * 0.04);
   }
 
   private drawGodRays(g: Phaser.GameObjects.Graphics, W: number, H: number, t: number) {
-    // Each shaft: position (0-1), phase offset, top/bottom width (fraction of W),
-    // reach (fraction of H), sway speed, sway amplitude, base opacity
-    const rays = [
-      { x: 0.07, ph: 0.00, tw: 0.007, bw: 0.052, len: 0.74, spd: 0.17, amp: 0.013, al: 0.058 },
-      { x: 0.16, ph: 1.30, tw: 0.004, bw: 0.036, len: 0.88, spd: 0.23, amp: 0.010, al: 0.038 },
-      { x: 0.27, ph: 2.50, tw: 0.009, bw: 0.060, len: 0.62, spd: 0.14, amp: 0.017, al: 0.062 },
-      { x: 0.38, ph: 0.80, tw: 0.005, bw: 0.042, len: 0.82, spd: 0.20, amp: 0.010, al: 0.044 },
-      { x: 0.50, ph: 3.20, tw: 0.010, bw: 0.055, len: 0.70, spd: 0.16, amp: 0.015, al: 0.055 },
-      { x: 0.61, ph: 1.75, tw: 0.005, bw: 0.038, len: 0.84, spd: 0.21, amp: 0.011, al: 0.040 },
-      { x: 0.73, ph: 0.50, tw: 0.011, bw: 0.057, len: 0.58, spd: 0.15, amp: 0.018, al: 0.060 },
-      { x: 0.84, ph: 2.70, tw: 0.006, bw: 0.044, len: 0.78, spd: 0.19, amp: 0.012, al: 0.042 },
-      { x: 0.93, ph: 1.10, tw: 0.008, bw: 0.050, len: 0.66, spd: 0.18, amp: 0.014, al: 0.050 },
+    // Each "ray" is a cluster of many thin semi-transparent lines fanning from the surface.
+    // Individually invisible — together they accumulate into a soft light column.
+    const clusters = [
+      { x: 0.07, ph: 0.00, spd: 0.15, al: 0.038 },
+      { x: 0.17, ph: 1.28, spd: 0.20, al: 0.028 },
+      { x: 0.29, ph: 2.55, spd: 0.13, al: 0.042 },
+      { x: 0.40, ph: 0.82, spd: 0.18, al: 0.030 },
+      { x: 0.51, ph: 3.18, spd: 0.16, al: 0.038 },
+      { x: 0.62, ph: 1.73, spd: 0.21, al: 0.028 },
+      { x: 0.74, ph: 0.48, spd: 0.14, al: 0.040 },
+      { x: 0.85, ph: 2.65, spd: 0.19, al: 0.030 },
+      { x: 0.94, ph: 1.05, spd: 0.17, al: 0.035 },
     ];
 
-    for (const r of rays) {
-      const sway = Math.sin(t * r.spd + r.ph) * W * r.amp;
-      const topX = W * r.x + sway * 0.20;   // top moves less (surface anchor)
-      const botX = W * r.x + sway;           // bottom drifts with current
-      const len  = H * r.len;
-      const tw   = W * r.tw;
-      const bw   = W * r.bw;
+    const LINES = 18;
+    for (const c of clusters) {
+      const sway = Math.sin(t * c.spd + c.ph) * W * 0.018;
+      const cx   = W * c.x + sway;
+      const baseAl = c.al * (0.85 + 0.15 * Math.abs(Math.sin(t * 0.22 + c.ph)));
 
-      // draw 5 gradient segments: bright at top, fades to transparent at bottom
-      const SEGS = 5;
-      for (let s = 0; s < SEGS; s++) {
-        const t0 = s / SEGS;
-        const t1 = (s + 1) / SEGS;
-        const al = r.al * (1 - t0 * 0.92);   // 0% → ~92% fade across length
-        const y0  = t0 * len, y1 = t1 * len;
-        const cx0 = topX + (botX - topX) * t0;
-        const cx1 = topX + (botX - topX) * t1;
-        const hw0 = (tw + (bw - tw) * t0) * 0.5;
-        const hw1 = (tw + (bw - tw) * t1) * 0.5;
-        g.fillStyle(0xb0dcff, al);
+      for (let li = 0; li < LINES; li++) {
+        // Gaussian distribution — lines concentrated in the center
+        const frac  = (li / (LINES - 1)) - 0.5;          // -0.5 … +0.5
+        const gauss = Math.exp(-frac * frac * 9);          // bell-curve weight
+        const lineAl = baseAl * gauss;
+        if (lineAl < 0.006) continue;
+
+        const topOff = frac * W * 0.008;                   // narrow spread at surface
+        const botOff = frac * W * 0.040 + sway * 0.55;    // wider spread + drift at depth
+        const depth  = H * (0.52 + Math.sin(c.ph + li * 0.21) * 0.10);
+
+        // midpoint wobble (gives the wavy "refracted" look)
+        const midX = cx + (topOff + botOff) * 0.5
+                       + Math.sin(t * 1.25 + c.ph + li * 0.70) * 5;
+        const midY = depth * 0.48;
+
+        // upper segment: full brightness
+        g.lineStyle(1.3, 0xb8dcff, lineAl);
         g.beginPath();
-        g.moveTo(cx0 - hw0, y0); g.lineTo(cx0 + hw0, y0);
-        g.lineTo(cx1 + hw1, y1); g.lineTo(cx1 - hw1, y1);
-        g.closePath(); g.fillPath();
-      }
+        g.moveTo(cx + topOff, 0);
+        g.lineTo(midX, midY);
+        g.strokePath();
 
-      // bright white core — top third only, narrow
-      g.fillStyle(0xffffff, r.al * 0.20);
-      const cLen = len * 0.28;
-      g.beginPath();
-      g.moveTo(topX - tw * 0.15, 0); g.lineTo(topX + tw * 0.15, 0);
-      g.lineTo(botX + bw * 0.10, cLen); g.lineTo(botX - bw * 0.10, cLen);
-      g.closePath(); g.fillPath();
+        // lower segment: fades to ~25%
+        g.lineStyle(1.3, 0xb8dcff, lineAl * 0.25);
+        g.beginPath();
+        g.moveTo(midX, midY);
+        g.lineTo(cx + botOff, depth);
+        g.strokePath();
+      }
     }
   }
 
   private drawCaustics(g: Phaser.GameObjects.Graphics, W: number, H: number, t: number) {
-    // caustics = bright irregular network where light focuses through surface ripples
-    const ROWS = 4, COLS = 6;
-    for (let row = 0; row < ROWS; row++) {
-      for (let col = 0; col < COLS; col++) {
-        const i  = row * COLS + col;
-        const cx = W * ((col + 0.5) / COLS) + Math.sin(t * 0.60 + i * 1.15) * W * 0.036;
-        const cy = H * (0.03 + row * 0.17)  + Math.cos(t * 0.45 + i * 0.88) * H * 0.020;
-        const cr = (16 + 10 * Math.abs(Math.sin(t * 1.05 + i * 0.68))) * (H / 800);
-        const al = 0.10 + 0.06 * Math.abs(Math.sin(t * 0.80 + i));
-        const tc = t * 1.55 + i * 0.52;    // per-patch time for shape morph
-        const N  = 7;
+    // soft light patches — filled blobs only, zero outlines
+    for (let row = 0; row < 3; row++) {
+      for (let col = 0; col < 5; col++) {
+        const i  = row * 5 + col;
+        const cx = W * ((col + 0.5) / 5) + Math.sin(t * 0.55 + i * 1.1) * W * 0.040;
+        const cy = H * (0.04 + row * 0.22) + Math.cos(t * 0.42 + i * 0.85) * H * 0.022;
+        const cr = (26 + 13 * Math.abs(Math.sin(t * 0.95 + i * 0.65))) * (H / 800);
+        const al = 0.044 + 0.024 * Math.abs(Math.sin(t * 0.78 + i));
+        const tc = t * 1.35 + i * 0.5;
+        const N  = 8;
 
-        // organic outline — faint fill + bright stroke = caustic ring
-        g.fillStyle(0x70b8e0, al * 0.22);
-        g.lineStyle(0.9, 0x98d8f8, al * 1.6);
+        // outer soft glow
+        g.fillStyle(0x70b8e8, al * 0.50);
         g.beginPath();
         for (let k = 0; k <= N; k++) {
           const a = (k / N) * Math.PI * 2;
-          const d = 1 + 0.38 * Math.sin(a * 3 + tc) + 0.22 * Math.cos(a * 2 + tc * 0.72);
-          const px = cx + Math.cos(a) * cr * d;
-          const py = cy + Math.sin(a) * cr * d;
-          k === 0 ? g.moveTo(px, py) : g.lineTo(px, py);
+          const d = 1 + 0.30 * Math.sin(a * 3 + tc) + 0.16 * Math.cos(a * 2 + tc * 0.65);
+          k === 0
+            ? g.moveTo(cx + Math.cos(a) * cr * 1.5 * d, cy + Math.sin(a) * cr * 1.5 * d)
+            : g.lineTo(cx + Math.cos(a) * cr * 1.5 * d, cy + Math.sin(a) * cr * 1.5 * d);
         }
-        g.closePath();
-        g.fillPath();
-        g.strokePath();  // path stays after fillPath — stroke the same shape
+        g.closePath(); g.fillPath();
 
-        // inner satellite lobe (secondary focus)
-        const sx = cx + Math.cos(tc * 0.4) * cr * 0.65;
-        const sy = cy + Math.sin(tc * 0.3) * cr * 0.55;
-        const sr = cr * 0.42;
-        g.fillStyle(0x80c8f0, al * 0.15);
-        g.lineStyle(0.7, 0x90d0f8, al * 1.0);
+        // inner brighter core
+        g.fillStyle(0x90cef8, al);
         g.beginPath();
         for (let k = 0; k <= N; k++) {
           const a = (k / N) * Math.PI * 2;
-          const d = 1 + 0.30 * Math.sin(a * 2 + tc * 1.2) + 0.18 * Math.cos(a * 3 - tc * 0.8);
-          g.lineTo(sx + Math.cos(a) * sr * d, sy + Math.sin(a) * sr * d);
+          const d = 1 + 0.30 * Math.sin(a * 3 + tc) + 0.16 * Math.cos(a * 2 + tc * 0.65);
+          k === 0
+            ? g.moveTo(cx + Math.cos(a) * cr * d, cy + Math.sin(a) * cr * d)
+            : g.lineTo(cx + Math.cos(a) * cr * d, cy + Math.sin(a) * cr * d);
         }
-        g.closePath();
-        g.fillPath();
-        g.strokePath();
+        g.closePath(); g.fillPath();
       }
     }
   }

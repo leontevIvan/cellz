@@ -105,7 +105,7 @@ export class EnemyCell {
       const a         = Math.random() * Math.PI * 2;
       this.wanderVx    = Math.cos(a) * this.speed;
       this.wanderVy    = Math.sin(a) * this.speed;
-      this.wanderTimer = Phaser.Math.FloatBetween(2.5, 5.5);
+      this.wanderTimer = Phaser.Math.FloatBetween(1.2, 3.0);
     }
 
     let tvx = this.wanderVx;
@@ -168,9 +168,6 @@ export class EnemyCell {
 
     const bodyAlpha  = this.isBig ? 0.70 : 0.52;
     const innerAlpha = this.isBig ? 0.28 : 0.20;
-
-    gfx.fillStyle(p.body, this.isBig ? 0.14 : 0.10);
-    fillBlob(gfx, this.x, this.y, rx * 1.40, ry * 1.40, p1, p2, p3, 28, dir);
 
     gfx.fillStyle(p.body, bodyAlpha);
     fillBlob(gfx, this.x, this.y, rx, ry, p1, p2, p3, 28, dir);

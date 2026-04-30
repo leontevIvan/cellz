@@ -155,9 +155,6 @@ export class AllyCell {
 
     drawFlagellum(gfx, this.x, this.y, r, dir, this.finPhase, MEMBRANE);
 
-    gfx.fillStyle(BODY, 0.11);
-    fillBlob(gfx, this.x, this.y, rx * 1.40, ry * 1.40, p1, p2, p3, 28, dir);
-
     gfx.fillStyle(BODY, 0.52);
     fillBlob(gfx, this.x, this.y, rx, ry, p1, p2, p3, 28, dir);
 

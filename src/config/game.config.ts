@@ -1,5 +1,7 @@
-export const GAME_WIDTH = window.innerWidth;
+export const GAME_WIDTH  = window.innerWidth;
 export const GAME_HEIGHT = window.innerHeight;
+export const WORLD_W     = GAME_WIDTH  * 3;
+export const WORLD_H     = GAME_HEIGHT * 3;
 
 export const CONFIG = {
   player: {
@@ -9,27 +11,27 @@ export const CONFIG = {
   },
   food: {
     spawnInterval: 1200,
-    count: 10,
+    count: 35,
     radius: 10,
   },
   enemy: {
     spawnInterval: 3500,
-    count: 5,
+    count: 18,
     radius: 28,
     speed: 28,
   },
   bigEnemy: {
     spawnInterval: 14000,
-    count: 2,
+    count: 6,
     radius: 88,
     speed: 16,
   },
   ally: {
-    count: 2,
+    count: 3,
     radius: 32,
     speed: 130,
   },
   bubble: {
-    count: 18,
+    count: 22,
   },
 };

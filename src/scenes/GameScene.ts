@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { CONFIG, GAME_WIDTH, GAME_HEIGHT } from '../config/game.config';
+import { CONFIG, WORLD_W, WORLD_H } from '../config/game.config';
 import { Food } from '../entities/Food';
 import type { FoodType } from '../entities/Food';
 import { EnemyCell } from '../entities/EnemyCell';
@@ -15,27 +15,28 @@ const BITE_DPS          = 10;
 const ALLY_BITE_DPS     = 8;
 const ENEMY_BITE_CD     = 1800;
 const BIG_ENEMY_BITE_CD = 2800;
-const HP_REGEN          = 3;    // hp/sec passive
+const HP_REGEN          = 3;
 
 interface Bubble { x: number; y: number; r: number; speed: number; alpha: number; }
 interface Snow   { x: number; y: number; vy: number; vx: number; r: number; alpha: number; }
+interface Weed   { x: number; phase: number; height: number; segments: number; color: number; swayAmp: number; thickness: number; }
 
 export class GameScene extends Phaser.Scene {
-  private gfx!: Phaser.GameObjects.Graphics;
+  private gfx!:    Phaser.GameObjects.Graphics;
+  private gfxHUD!: Phaser.GameObjects.Graphics;
   private foods:   Food[]      = [];
   private enemies: EnemyCell[] = [];
   private allies:  AllyCell[]  = [];
   private bubbles: Bubble[]    = [];
   private snow:    Snow[]      = [];
+  private weeds:   Weed[]      = [];
 
-  // player movement
-  private px = GAME_WIDTH / 2;
-  private py = GAME_HEIGHT / 2;
+  private px = WORLD_W / 2;
+  private py = WORLD_H / 2;
   private pvx = 0; private pvy = 0;
   private pDir = 0;
   private pRadius = CONFIG.player.radius;
 
-  // player blob shape
   private pRxF = 1.0; private pRyF = 0.95;
   private pBp1 = 0.0; private pBp2 = 1.2; private pBp3 = 2.5;
   private pNox = 0.22; private pNoy = -0.18;
@@ -46,31 +47,25 @@ export class GameScene extends Phaser.Scene {
   ];
   private pFinPhase = 0;
 
-  // player health
   private pHp    = CONFIG.player.maxHp;
   private pMaxHp = CONFIG.player.maxHp;
 
-  // combat
   private score      = 0;
   private invincible = 0;
   private pBiting    = false;
   private enemyBiteCD: Map<EnemyCell, number> = new Map();
 
-  // timers
   private foodTimer     = 0;
   private enemyTimer    = 0;
   private bigEnemyTimer = 0;
 
-  // input
   private pointer: Phaser.Input.Pointer | null = null;
-  private pCursorX = GAME_WIDTH / 2;
-  private pCursorY = GAME_HEIGHT / 2;
+  private pCursorX = WORLD_W / 2;
+  private pCursorY = WORLD_H / 2;
 
-  // HUD
   private scoreText!: Phaser.GameObjects.Text;
   private sizeText!:  Phaser.GameObjects.Text;
 
-  // particles
   private eatParticles: { x: number; y: number; vx: number; vy: number; life: number; color: number }[] = [];
 
   constructor() { super('GameScene'); }
@@ -79,8 +74,10 @@ export class GameScene extends Phaser.Scene {
     const W = this.scale.width;
     const H = this.scale.height;
 
-    this.gfx = this.add.graphics();
-    this.px = W / 2; this.py = H / 2;
+    this.gfx    = this.add.graphics();
+    this.gfxHUD = this.add.graphics().setScrollFactor(0).setDepth(5);
+
+    this.px = WORLD_W / 2; this.py = WORLD_H / 2;
     this.pRadius   = CONFIG.player.radius;
     this.pRxF      = Phaser.Math.FloatBetween(0.92, 1.08);
     this.pRyF      = Phaser.Math.FloatBetween(0.92, 1.08);
@@ -92,30 +89,33 @@ export class GameScene extends Phaser.Scene {
     this.pHp       = CONFIG.player.maxHp;
     this.pMaxHp    = CONFIG.player.maxHp;
     this.score     = 0; this.invincible = 0; this.pDir = 0;
-    this.foods = []; this.enemies = []; this.allies = [];
+    this.foods = []; this.enemies = []; this.allies = []; this.weeds = [];
     this.eatParticles = []; this.enemyBiteCD = new Map();
     this.foodTimer = 0; this.enemyTimer = 0; this.bigEnemyTimer = 0;
 
     this.scoreText = this.add.text(16, 18, 'Очки: 0', {
       fontSize: '20px', color: '#a8d8c0', fontFamily: 'monospace',
-    }).setDepth(10);
+    }).setDepth(10).setScrollFactor(0);
     this.sizeText = this.add.text(16, 44, '', {
       fontSize: '14px', color: '#6abf98', fontFamily: 'monospace',
-    }).setDepth(10);
+    }).setDepth(10).setScrollFactor(0);
+
+    this.cameras.main.setBounds(0, 0, WORLD_W, WORLD_H);
 
     this.initSnow(W, H);
+    this.initWeeds();
     this.spawnInitialFood();
     this.spawnInitialBubbles(W, H);
-    this.spawnInitialAllies(W, H);
+    this.spawnInitialAllies();
 
-    this.pCursorX = W / 2; this.pCursorY = H / 2;
+    this.pCursorX = WORLD_W / 2; this.pCursorY = WORLD_H / 2;
     this.input.on('pointerdown', (p: Phaser.Input.Pointer) => {
       this.pointer  = p;
-      this.pCursorX = p.x; this.pCursorY = p.y;
+      this.pCursorX = p.worldX; this.pCursorY = p.worldY;
     });
     this.input.on('pointerup', () => { this.pointer = null; });
     this.input.on('pointermove', (p: Phaser.Input.Pointer) => {
-      this.pCursorX = p.x; this.pCursorY = p.y;
+      this.pCursorX = p.worldX; this.pCursorY = p.worldY;
       if (this.pointer) this.pointer = p;
     });
   }
@@ -128,22 +128,33 @@ export class GameScene extends Phaser.Scene {
     this.bigEnemyTimer += delta;
     if (this.invincible > 0) this.invincible -= delta;
 
-    // passive HP regen
     this.pHp = Math.min(this.pMaxHp, this.pHp + HP_REGEN * delta / 1000);
 
-    this.updatePlayer(delta, W, H);
-    this.updateFood(delta, W, H);
-    this.updateEnemies(delta, W, H);
-    this.updateAllies(delta, W, H);
+    this.updatePlayer(delta);
+    this.updateCamera(delta, W, H);
+    this.updateFood(delta);
+    this.updateEnemies(delta);
+    this.updateAllies(delta);
     this.updateBubbles(delta, W, H);
     this.updateSnow(delta, W, H);
     this.checkCollisions(delta);
     this.render(W, H);
   }
 
+  // ── Camera ──────────────────────────────────────────────────────────────────
+
+  private updateCamera(delta: number, W: number, H: number) {
+    const dt  = delta / 1000;
+    const cam = this.cameras.main;
+    const targetX = Phaser.Math.Clamp(this.px - W / 2, 0, WORLD_W - W);
+    const targetY = Phaser.Math.Clamp(this.py - H / 2, 0, WORLD_H - H);
+    cam.scrollX = Phaser.Math.Linear(cam.scrollX, targetX, Math.min(1, 6 * dt));
+    cam.scrollY = Phaser.Math.Linear(cam.scrollY, targetY, Math.min(1, 6 * dt));
+  }
+
   // ── Player ──────────────────────────────────────────────────────────────────
 
-  private updatePlayer(delta: number, W: number, H: number) {
+  private updatePlayer(delta: number) {
     const dt = delta / 1000;
     this.pBp1      += dt * 2.20;
     this.pBp2      += dt * 1.55;
@@ -151,8 +162,8 @@ export class GameScene extends Phaser.Scene {
     this.pFinPhase += dt * 2.6;
 
     if (this.pointer && this.pointer.isDown) {
-      const dx = this.pointer.x - this.px;
-      const dy = this.pointer.y - this.py;
+      const dx = this.pCursorX - this.px;
+      const dy = this.pCursorY - this.py;
       const d  = Math.hypot(dx, dy);
       if (d > 4) {
         const spd = CONFIG.player.speed * (CONFIG.player.radius / this.pRadius);
@@ -165,10 +176,9 @@ export class GameScene extends Phaser.Scene {
 
     this.px += this.pvx * dt;
     this.py += this.pvy * dt;
-    this.px = Phaser.Math.Clamp(this.px, this.pRadius, W - this.pRadius);
-    this.py = Phaser.Math.Clamp(this.py, this.pRadius, H - this.pRadius);
+    this.px = Phaser.Math.Clamp(this.px, this.pRadius, WORLD_W - this.pRadius);
+    this.py = Phaser.Math.Clamp(this.py, this.pRadius, WORLD_H - this.pRadius);
 
-    // rotate cell toward cursor, not movement direction
     const targetDir = Math.atan2(this.pCursorY - this.py, this.pCursorX - this.px);
     const dAngle    = Phaser.Math.Angle.Wrap(targetDir - this.pDir);
     this.pDir       = Phaser.Math.Angle.Wrap(this.pDir + dAngle * Math.min(1, 7 * dt));
@@ -185,38 +195,35 @@ export class GameScene extends Phaser.Scene {
   }
 
   private spawnFood() {
-    const W = this.scale.width, H = this.scale.height, m = 40;
-    const x = Phaser.Math.Between(m, W - m);
-    const y = Phaser.Math.Between(m, H - m);
+    const m = 40;
+    const x = Phaser.Math.Between(m, WORLD_W - m);
+    const y = Phaser.Math.Between(m, WORLD_H - 110);
     const type: FoodType = Math.random() < 0.6 ? 'green' : 'red';
     this.foods.push(new Food(this, x, y, type, CONFIG.food.radius));
   }
 
-  private updateFood(delta: number, W: number, H: number) {
+  private updateFood(delta: number) {
     if (this.foodTimer > CONFIG.food.spawnInterval && this.foods.length < CONFIG.food.count) {
       this.spawnFood(); this.foodTimer = 0;
     }
-    for (const f of this.foods) f.update(delta, W, H);
+    for (const f of this.foods) f.update(delta, WORLD_W, WORLD_H);
     this.foods = this.foods.filter(f => f.alive);
   }
 
   // ── Allies ───────────────────────────────────────────────────────────────────
 
-  private spawnInitialAllies(W: number, H: number) {
+  private spawnInitialAllies() {
     for (let i = 0; i < CONFIG.ally.count; i++) {
-      const margin = 80;
-      const x = Phaser.Math.Between(margin, W - margin);
-      const y = Phaser.Math.Between(margin, H - margin);
+      const x = Phaser.Math.Between(WORLD_W / 2 - 220, WORLD_W / 2 + 220);
+      const y = Phaser.Math.Between(WORLD_H / 2 - 220, WORLD_H / 2 + 220);
       this.allies.push(new AllyCell(this, x, y, CONFIG.ally.radius, CONFIG.ally.speed));
     }
   }
 
-  private updateAllies(delta: number, W: number, H: number) {
+  private updateAllies(delta: number) {
     for (const a of this.allies) {
-      a.updateAI(delta, W, H, this.px, this.py, this.enemies, this.pBiting);
+      a.updateAI(delta, WORLD_W, WORLD_H, this.px, this.py, this.enemies, this.pBiting);
     }
-
-    // allies eat food
     for (const a of this.allies) {
       for (const f of this.foods) {
         if (!f.alive) continue;
@@ -227,7 +234,6 @@ export class GameScene extends Phaser.Scene {
         }
       }
     }
-
     this.allies = this.allies.filter(a => a.alive);
   }
 
@@ -273,37 +279,53 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
+  // ── Seaweed ──────────────────────────────────────────────────────────────────
+
+  private initWeeds() {
+    const count = Math.floor(WORLD_W / 42);
+    for (let i = 0; i < count; i++) {
+      const h   = Phaser.Math.FloatBetween(35, 130);
+      const rng = Math.random();
+      this.weeds.push({
+        x:         Phaser.Math.FloatBetween(10, WORLD_W - 10),
+        phase:     Phaser.Math.FloatBetween(0, Math.PI * 2),
+        height:    h,
+        segments:  Math.max(3, Math.floor(h / 11)),
+        color:     rng < 0.40 ? 0x2a8040 : rng < 0.70 ? 0x1a5828 : 0x3d7020,
+        swayAmp:   h * 0.16,
+        thickness: Phaser.Math.FloatBetween(1.2, 2.8),
+      });
+    }
+  }
+
   // ── Enemies ─────────────────────────────────────────────────────────────────
 
   private spawnEnemy(big = false) {
-    const W = this.scale.width, H = this.scale.height;
     const side = Phaser.Math.Between(0, 3);
+    const r    = big ? CONFIG.bigEnemy.radius : CONFIG.enemy.radius;
     let x = 0, y = 0;
-    const r = big ? CONFIG.bigEnemy.radius : CONFIG.enemy.radius;
-    if      (side === 0) { x = Phaser.Math.Between(r, W - r); y = -r; }
-    else if (side === 1) { x = W + r; y = Phaser.Math.Between(r, H - r); }
-    else if (side === 2) { x = Phaser.Math.Between(r, W - r); y = H + r; }
-    else                 { x = -r;    y = Phaser.Math.Between(r, H - r); }
+    if      (side === 0) { x = Phaser.Math.Between(r, WORLD_W - r); y = r; }
+    else if (side === 1) { x = WORLD_W - r; y = Phaser.Math.Between(r, WORLD_H - r); }
+    else if (side === 2) { x = Phaser.Math.Between(r, WORLD_W - r); y = WORLD_H - r; }
+    else                 { x = r;           y = Phaser.Math.Between(r, WORLD_H - r); }
     const spd = big ? CONFIG.bigEnemy.speed : CONFIG.enemy.speed;
     this.enemies.push(new EnemyCell(this, x, y, spd, r, big));
   }
 
-  private updateEnemies(delta: number, W: number, H: number) {
+  private updateEnemies(delta: number) {
     if (this.enemyTimer > CONFIG.enemy.spawnInterval) {
       const normalCount = this.enemies.filter(e => !e.isBig).length;
-      if (normalCount < CONFIG.enemy.count) { this.spawnEnemy(false); }
+      if (normalCount < CONFIG.enemy.count) this.spawnEnemy(false);
       this.enemyTimer = 0;
     }
-
     if (this.bigEnemyTimer > CONFIG.bigEnemy.spawnInterval) {
       const bigCount = this.enemies.filter(e => e.isBig).length;
-      if (bigCount < CONFIG.bigEnemy.count) { this.spawnEnemy(true); }
+      if (bigCount < CONFIG.bigEnemy.count) this.spawnEnemy(true);
       this.bigEnemyTimer = 0;
     }
 
     for (const e of this.enemies) {
       e.isBiting = false;
-      // track the closest living target (player or ally) within aggro range
       let nearX = this.px, nearY = this.py;
       let nearDist = Math.hypot(this.px - e.x, this.py - e.y);
       for (const a of this.allies) {
@@ -311,12 +333,11 @@ export class GameScene extends Phaser.Scene {
         const ad = Math.hypot(a.x - e.x, a.y - e.y);
         if (ad < nearDist) { nearDist = ad; nearX = a.x; nearY = a.y; }
       }
-      e.update(delta, W, H, nearX, nearY);
+      e.update(delta, WORLD_W, WORLD_H, nearX, nearY);
     }
 
-    // enemies eat food
     for (const e of this.enemies) {
-      if (e.isBig) continue; // big enemies don't bother with food
+      if (e.isBig) continue;
       for (const f of this.foods) {
         if (!f.alive) continue;
         if (Math.hypot(e.x - f.x, e.y - f.y) < e.radius + f.radius) {
@@ -334,7 +355,6 @@ export class GameScene extends Phaser.Scene {
   private checkCollisions(delta: number) {
     const dt = delta / 1000;
 
-    // player eats food (also heals)
     for (const f of this.foods) {
       if (!f.alive) continue;
       if (Math.hypot(this.px - f.x, this.py - f.y) < this.pRadius + f.radius - 4) {
@@ -349,13 +369,11 @@ export class GameScene extends Phaser.Scene {
       }
     }
 
-    // player vs enemies
     this.pBiting = false;
     for (const e of this.enemies) {
       const dist = Math.hypot(this.px - e.x, this.py - e.y);
       if (dist >= this.pRadius + e.radius) continue;
 
-      // player bites enemy — damage scales with player growth
       if (this.pRadius >= e.radius * 0.70) {
         this.pBiting = true;
         const sizeBonus = Math.sqrt(this.pRadius / CONFIG.player.radius);
@@ -373,7 +391,6 @@ export class GameScene extends Phaser.Scene {
         }
       }
 
-      // enemy bites player from jowl side only
       if (e.alive && this.invincible <= 0) {
         const spd = Math.hypot(e.vx, e.vy);
         const efx = spd > 0.1 ? e.vx / spd : 1;
@@ -397,14 +414,12 @@ export class GameScene extends Phaser.Scene {
       }
     }
 
-    // ally bites enemies
     for (const a of this.allies) {
       if (!a.isBiting) continue;
       for (const e of this.enemies) {
         if (!e.alive) continue;
         const d = Math.hypot(a.x - e.x, a.y - e.y);
         if (d < a.radius + e.radius + 6) {
-          // cooperation bonus: +40% damage when player also biting
           const coopMult = a.cooperating ? 1.4 : 1.0;
           e.takeDamage(ALLY_BITE_DPS * dt * (a.radius / e.radius) * coopMult);
           if (!e.alive) {
@@ -417,7 +432,6 @@ export class GameScene extends Phaser.Scene {
       }
     }
 
-    // big enemies bite allies
     for (const e of this.enemies) {
       if (!e.isBig) continue;
       for (const a of this.allies) {
@@ -431,7 +445,7 @@ export class GameScene extends Phaser.Scene {
           if (dot > 0.28) {
             const cd = this.enemyBiteCD.get(e) ?? 0;
             if (cd <= 0) {
-              a.takeDamage(95); // one-shots most ally cells
+              a.takeDamage(95);
               this.spawnEatParticles(a.x, a.y, 0x38d8b8);
               this.enemyBiteCD.set(e, BIG_ENEMY_BITE_CD);
             }
@@ -460,38 +474,44 @@ export class GameScene extends Phaser.Scene {
   // ── Render ───────────────────────────────────────────────────────────────────
 
   private render(W: number, H: number) {
-    const g = this.gfx;
+    const g   = this.gfx;
+    const hud = this.gfxHUD;
     g.clear();
-    this.drawOcean(g, W, H);
-    this.drawSnow(g);
-    this.drawBubbles(g);
-    for (const f of this.foods)  f.draw(g);
-    for (const a of this.allies) a.draw(g);
+    hud.clear();
+
+    const cam = this.cameras.main;
+    const cx  = cam.scrollX;
+    const cy  = cam.scrollY;
+
+    this.drawOcean(g, W, H, cx, cy);
+    this.drawSurface(g, W, cx, cy);
+    this.drawSeafloor(g, W, H, cx, cy);
+    this.drawWeeds(g, W, H, cx, cy);
+    this.drawSnow(g, cx, cy);
+    this.drawBubbles(g, cx, cy);
+    for (const f of this.foods)   f.draw(g);
+    for (const a of this.allies)  a.draw(g);
     for (const e of this.enemies) e.draw(g);
     this.drawEatParticles(g);
     this.drawPlayer(g);
-    this.drawHUD(g, W);
+    this.drawHUD(hud, W);
   }
 
   // ── Ocean ───────────────────────────────────────────────────────────────────
 
-  private drawOcean(g: Phaser.GameObjects.Graphics, W: number, H: number) {
-    // restore original bright palette
-    g.fillStyle(0x0d3a6a, 1);    g.fillRect(0, 0,        W, H);
-    g.fillStyle(0x2a88c8, 0.55); g.fillRect(0, 0,        W, H * 0.18);
-    g.fillStyle(0x1a60a0, 0.42); g.fillRect(0, 0,        W, H * 0.42);
-    g.fillStyle(0x082848, 0.28); g.fillRect(0, H * 0.58, W, H * 0.42);
-    g.fillStyle(0x041828, 0.32); g.fillRect(0, H * 0.82, W, H * 0.18);
+  private drawOcean(g: Phaser.GameObjects.Graphics, W: number, H: number, cx: number, cy: number) {
+    g.fillStyle(0x0d3a6a, 1);    g.fillRect(cx, cy,            W, H);
+    g.fillStyle(0x2a88c8, 0.55); g.fillRect(cx, cy,            W, H * 0.18);
+    g.fillStyle(0x1a60a0, 0.42); g.fillRect(cx, cy,            W, H * 0.42);
+    g.fillStyle(0x082848, 0.28); g.fillRect(cx, cy + H * 0.58, W, H * 0.42);
+    g.fillStyle(0x041828, 0.32); g.fillRect(cx, cy + H * 0.82, W, H * 0.18);
 
     const t = this.time.now / 1000;
+    this.drawGodRays(g, W, H, t, cx, cy);
 
-    // god rays (thin lines — behind everything)
-    this.drawGodRays(g, W, H, t);
-
-    // water current bands (original, unchanged)
     const wt = t / 1.8;
     for (let i = 0; i < 7; i++) {
-      const baseY = H * (0.06 + i * 0.135);
+      const baseY = cy + H * (0.06 + i * 0.135);
       const amp   = (10 + 6 * Math.sin(i * 1.8)) * (H / 800);
       const spd   = 0.55 + i * 0.10;
       const phase = i * 1.05;
@@ -501,28 +521,24 @@ export class GameScene extends Phaser.Scene {
       g.beginPath();
       for (let xi = 0; xi <= W + 12; xi += 10) {
         const y = baseY + amp * Math.sin((xi / W) * Math.PI * 3.5 + wt * spd + phase);
-        xi === 0 ? g.moveTo(xi, y) : g.lineTo(xi, y);
+        xi === 0 ? g.moveTo(cx + xi, y) : g.lineTo(cx + xi, y);
       }
       for (let xi = W; xi >= 0; xi -= 10) {
         const y = baseY + thick + amp * Math.sin((xi / W) * Math.PI * 3.5 + wt * spd + phase + 0.35);
-        g.lineTo(xi, y);
+        g.lineTo(cx + xi, y);
       }
       g.closePath(); g.fillPath();
     }
 
-    // caustic light patches (fill only, no outlines)
-    this.drawCaustics(g, W, H, t);
+    this.drawCaustics(g, W, H, t, cx, cy);
 
-    // edge + seabed vignette (original)
-    g.fillStyle(0x000000, 0.10); g.fillRect(0,         0, W * 0.05, H);
-    g.fillStyle(0x000000, 0.10); g.fillRect(W * 0.95,  0, W * 0.05, H);
-    g.fillStyle(0x1a2830, 0.60); g.fillRect(0, H * 0.93, W, H * 0.07);
-    g.fillStyle(0x283840, 0.35); g.fillRect(0, H * 0.91, W, H * 0.04);
+    g.fillStyle(0x000000, 0.10); g.fillRect(cx,            cy, W * 0.05, H);
+    g.fillStyle(0x000000, 0.10); g.fillRect(cx + W * 0.95, cy, W * 0.05, H);
+    g.fillStyle(0x1a2830, 0.60); g.fillRect(cx, cy + H * 0.93, W, H * 0.07);
+    g.fillStyle(0x283840, 0.35); g.fillRect(cx, cy + H * 0.91, W, H * 0.04);
   }
 
-  private drawGodRays(g: Phaser.GameObjects.Graphics, W: number, H: number, t: number) {
-    // Each "ray" is a cluster of many thin semi-transparent lines fanning from the surface.
-    // Individually invisible — together they accumulate into a soft light column.
+  private drawGodRays(g: Phaser.GameObjects.Graphics, W: number, H: number, t: number, cx: number, cy: number) {
     const clusters = [
       { x: 0.07, ph: 0.00, spd: 0.15, al: 0.038 },
       { x: 0.17, ph: 1.28, spd: 0.20, al: 0.028 },
@@ -537,95 +553,166 @@ export class GameScene extends Phaser.Scene {
 
     const LINES = 18;
     for (const c of clusters) {
-      const sway = Math.sin(t * c.spd + c.ph) * W * 0.018;
-      const cx   = W * c.x + sway;
+      const sway  = Math.sin(t * c.spd + c.ph) * W * 0.018;
+      const cxc   = cx + W * c.x + sway;
       const baseAl = c.al * (0.85 + 0.15 * Math.abs(Math.sin(t * 0.22 + c.ph)));
 
       for (let li = 0; li < LINES; li++) {
-        // Gaussian distribution — lines concentrated in the center
-        const frac  = (li / (LINES - 1)) - 0.5;          // -0.5 … +0.5
-        const gauss = Math.exp(-frac * frac * 9);          // bell-curve weight
+        const frac   = (li / (LINES - 1)) - 0.5;
+        const gauss  = Math.exp(-frac * frac * 9);
         const lineAl = baseAl * gauss;
         if (lineAl < 0.006) continue;
 
-        const topOff = frac * W * 0.008;                   // narrow spread at surface
-        const botOff = frac * W * 0.040 + sway * 0.55;    // wider spread + drift at depth
+        const topOff = frac * W * 0.008;
+        const botOff = frac * W * 0.040 + sway * 0.55;
         const depth  = H * (0.52 + Math.sin(c.ph + li * 0.21) * 0.10);
+        const midX   = cxc + (topOff + botOff) * 0.5 + Math.sin(t * 1.25 + c.ph + li * 0.70) * 5;
+        const midY   = cy + depth * 0.48;
 
-        // midpoint wobble (gives the wavy "refracted" look)
-        const midX = cx + (topOff + botOff) * 0.5
-                       + Math.sin(t * 1.25 + c.ph + li * 0.70) * 5;
-        const midY = depth * 0.48;
-
-        // upper segment: full brightness
         g.lineStyle(1.3, 0xb8dcff, lineAl);
-        g.beginPath();
-        g.moveTo(cx + topOff, 0);
-        g.lineTo(midX, midY);
-        g.strokePath();
+        g.beginPath(); g.moveTo(cxc + topOff, cy); g.lineTo(midX, midY); g.strokePath();
 
-        // lower segment: fades to ~25%
         g.lineStyle(1.3, 0xb8dcff, lineAl * 0.25);
-        g.beginPath();
-        g.moveTo(midX, midY);
-        g.lineTo(cx + botOff, depth);
-        g.strokePath();
+        g.beginPath(); g.moveTo(midX, midY); g.lineTo(cxc + botOff, cy + depth); g.strokePath();
       }
     }
   }
 
-  private drawCaustics(g: Phaser.GameObjects.Graphics, W: number, H: number, t: number) {
-    // soft light patches — filled blobs only, zero outlines
+  private drawCaustics(g: Phaser.GameObjects.Graphics, W: number, H: number, t: number, cx: number, cy: number) {
     for (let row = 0; row < 3; row++) {
       for (let col = 0; col < 5; col++) {
-        const i  = row * 5 + col;
-        const cx = W * ((col + 0.5) / 5) + Math.sin(t * 0.55 + i * 1.1) * W * 0.040;
-        const cy = H * (0.04 + row * 0.22) + Math.cos(t * 0.42 + i * 0.85) * H * 0.022;
-        const cr = (26 + 13 * Math.abs(Math.sin(t * 0.95 + i * 0.65))) * (H / 800);
-        const al = 0.044 + 0.024 * Math.abs(Math.sin(t * 0.78 + i));
-        const tc = t * 1.35 + i * 0.5;
-        const N  = 8;
+        const i   = row * 5 + col;
+        const px2 = cx + W * ((col + 0.5) / 5) + Math.sin(t * 0.55 + i * 1.1) * W * 0.040;
+        const py2 = cy + H * (0.04 + row * 0.22) + Math.cos(t * 0.42 + i * 0.85) * H * 0.022;
+        const cr  = (26 + 13 * Math.abs(Math.sin(t * 0.95 + i * 0.65))) * (H / 800);
+        const al  = 0.044 + 0.024 * Math.abs(Math.sin(t * 0.78 + i));
+        const tc  = t * 1.35 + i * 0.5;
+        const N   = 8;
 
-        // outer soft glow
         g.fillStyle(0x70b8e8, al * 0.50);
         g.beginPath();
         for (let k = 0; k <= N; k++) {
           const a = (k / N) * Math.PI * 2;
           const d = 1 + 0.30 * Math.sin(a * 3 + tc) + 0.16 * Math.cos(a * 2 + tc * 0.65);
           k === 0
-            ? g.moveTo(cx + Math.cos(a) * cr * 1.5 * d, cy + Math.sin(a) * cr * 1.5 * d)
-            : g.lineTo(cx + Math.cos(a) * cr * 1.5 * d, cy + Math.sin(a) * cr * 1.5 * d);
+            ? g.moveTo(px2 + Math.cos(a) * cr * 1.5 * d, py2 + Math.sin(a) * cr * 1.5 * d)
+            : g.lineTo(px2 + Math.cos(a) * cr * 1.5 * d, py2 + Math.sin(a) * cr * 1.5 * d);
         }
         g.closePath(); g.fillPath();
 
-        // inner brighter core
         g.fillStyle(0x90cef8, al);
         g.beginPath();
         for (let k = 0; k <= N; k++) {
           const a = (k / N) * Math.PI * 2;
           const d = 1 + 0.30 * Math.sin(a * 3 + tc) + 0.16 * Math.cos(a * 2 + tc * 0.65);
           k === 0
-            ? g.moveTo(cx + Math.cos(a) * cr * d, cy + Math.sin(a) * cr * d)
-            : g.lineTo(cx + Math.cos(a) * cr * d, cy + Math.sin(a) * cr * d);
+            ? g.moveTo(px2 + Math.cos(a) * cr * d, py2 + Math.sin(a) * cr * d)
+            : g.lineTo(px2 + Math.cos(a) * cr * d, py2 + Math.sin(a) * cr * d);
         }
         g.closePath(); g.fillPath();
       }
     }
   }
 
-  private drawSnow(g: Phaser.GameObjects.Graphics) {
-    for (const s of this.snow) {
-      g.fillStyle(0xc8dff8, s.alpha);
-      g.fillCircle(s.x, s.y, s.r);
+  // ── Surface (top of world — bright shore band) ───────────────────────────────
+
+  private drawSurface(g: Phaser.GameObjects.Graphics, W: number, cx: number, cy: number) {
+    if (cy > 180) return;
+
+    const t = this.time.now / 1000;
+
+    g.fillStyle(0x80e8ff, 0.42); g.fillRect(cx, 0, W, 70);
+    g.fillStyle(0xc0f8ff, 0.24); g.fillRect(cx, 0, W, 30);
+    g.fillStyle(0xffffff, 0.09); g.fillRect(cx, 0, W, 12);
+
+    for (let wi = 0; wi < 4; wi++) {
+      const baseWY = wi * 16;
+      g.fillStyle(0xa8ecff, 0.13 - wi * 0.025);
+      g.beginPath();
+      for (let xi = 0; xi <= W; xi += 12) {
+        const y = baseWY + 7 * Math.sin((cx + xi) * 0.0055 + t * 1.1 + wi * 1.5);
+        xi === 0 ? g.moveTo(cx + xi, y) : g.lineTo(cx + xi, y);
+      }
+      for (let xi = W; xi >= 0; xi -= 12) {
+        const y = baseWY + 14 + 7 * Math.sin((cx + xi) * 0.0055 + t * 1.1 + wi * 1.5 + 0.45);
+        g.lineTo(cx + xi, y);
+      }
+      g.closePath(); g.fillPath();
     }
   }
 
-  private drawBubbles(g: Phaser.GameObjects.Graphics) {
+  // ── Seafloor ─────────────────────────────────────────────────────────────────
+
+  private drawSeafloor(g: Phaser.GameObjects.Graphics, W: number, H: number, cx: number, cy: number) {
+    const floorY = WORLD_H - 90;
+    if (floorY > cy + H + 20 || floorY + 90 < cy - 20) return;
+
+    const t = this.time.now / 1000;
+
+    g.fillStyle(0x7a6040, 1);     g.fillRect(cx, floorY, W, 90);
+    g.fillStyle(0xb08850, 0.50);  g.fillRect(cx, floorY, W, 16);
+    g.fillStyle(0xd0a870, 0.28);  g.fillRect(cx, floorY, W, 7);
+
+    for (let ri = 0; ri < 7; ri++) {
+      const ry = floorY + 22 + ri * 9;
+      g.lineStyle(1.0, 0x5a4020, 0.18);
+      g.beginPath();
+      for (let xi = 0; xi <= W; xi += 8) {
+        const y = ry + 2.5 * Math.sin((cx + xi) * 0.012 + ri * 0.5 + t * 0.10);
+        xi === 0 ? g.moveTo(cx + xi, y) : g.lineTo(cx + xi, y);
+      }
+      g.strokePath();
+    }
+  }
+
+  // ── Weeds ────────────────────────────────────────────────────────────────────
+
+  private drawWeeds(g: Phaser.GameObjects.Graphics, W: number, H: number, cx: number, cy: number) {
+    const floorY = WORLD_H - 90;
+    if (floorY - 140 > cy + H || floorY < cy - 20) return;
+
+    const t    = this.time.now / 1000;
+    const minX = cx - 60;
+    const maxX = cx + W + 60;
+
+    for (const weed of this.weeds) {
+      if (weed.x < minX || weed.x > maxX) continue;
+
+      const seg = weed.segments;
+      g.lineStyle(weed.thickness, weed.color, 0.88);
+      g.beginPath();
+      g.moveTo(weed.x, floorY);
+
+      for (let i = 1; i <= seg; i++) {
+        const frac  = i / seg;
+        const swayX = weed.swayAmp * Math.sin(t * 0.80 + weed.phase + frac * Math.PI * 2.5) * frac * 0.9;
+        g.lineTo(weed.x + swayX, floorY - weed.height * frac);
+      }
+      g.strokePath();
+
+      // tip leaf
+      const tipSway = weed.swayAmp * Math.sin(t * 0.80 + weed.phase + Math.PI * 2.5) * 0.9;
+      g.fillStyle(weed.color, 0.58);
+      g.fillEllipse(weed.x + tipSway, floorY - weed.height, weed.thickness * 3.5, weed.thickness * 2.2);
+    }
+  }
+
+  // ── Atmospheric ─────────────────────────────────────────────────────────────
+
+  private drawSnow(g: Phaser.GameObjects.Graphics, cx: number, cy: number) {
+    for (const s of this.snow) {
+      g.fillStyle(0xc8dff8, s.alpha);
+      g.fillCircle(cx + s.x, cy + s.y, s.r);
+    }
+  }
+
+  private drawBubbles(g: Phaser.GameObjects.Graphics, cx: number, cy: number) {
     for (const b of this.bubbles) {
+      const wx = cx + b.x, wy = cy + b.y;
       g.lineStyle(0.8, 0x9ad0e8, b.alpha * 0.85);
-      g.strokeCircle(b.x, b.y, b.r);
+      g.strokeCircle(wx, wy, b.r);
       g.fillStyle(0xffffff, b.alpha * 0.30);
-      g.fillCircle(b.x - b.r * 0.28, b.y - b.r * 0.28, b.r * 0.25);
+      g.fillCircle(wx - b.r * 0.28, wy - b.r * 0.28, b.r * 0.25);
     }
   }
 
@@ -644,7 +731,6 @@ export class GameScene extends Phaser.Scene {
   // ── HUD ──────────────────────────────────────────────────────────────────────
 
   private drawHUD(g: Phaser.GameObjects.Graphics, W: number) {
-    // HP bar at top-right
     const bw = 180, bh = 10;
     const bx = W - 16 - bw, by = 18;
     g.fillStyle(0x000000, 0.45);
@@ -655,11 +741,9 @@ export class GameScene extends Phaser.Scene {
     const col = hf > 0.55 ? 0x44dd88 : hf > 0.28 ? 0xe0c030 : 0xe04030;
     g.fillStyle(col, 1);
     g.fillRoundedRect(bx, by, bw * hf, bh, 3);
-    // HP bar border
     g.lineStyle(1, 0x60c8a0, 0.45);
     g.strokeRoundedRect(bx, by, bw, bh, 3);
 
-    // ally count dots
     const aliveAllies = this.allies.filter(a => a.alive).length;
     for (let i = 0; i < CONFIG.ally.count; i++) {
       const ax = W - 16 - bw + i * 16;
@@ -674,27 +758,23 @@ export class GameScene extends Phaser.Scene {
   // ── Player ───────────────────────────────────────────────────────────────────
 
   private drawPlayer(g: Phaser.GameObjects.Graphics) {
-    const r   = this.pRadius;
-    const dir = this.pDir;
+    const r      = this.pRadius;
+    const dir    = this.pDir;
     const flicker = this.invincible > 0 && Math.floor(this.invincible / 80) % 2 === 0;
     if (flicker) return;
 
     const p1 = this.pBp1, p2 = this.pBp2, p3 = this.pBp3;
 
-    // area-conserving dynamic deformation along facing direction
     const spd     = Math.hypot(this.pvx, this.pvy);
     const sf      = Math.min(1, spd / (CONFIG.player.speed * 1.1));
     const pulse   = 1 + 0.09 * Math.sin(this.pFinPhase * 0.38);
     const stretch = (1 + 0.28 * sf) * pulse;
-    const rx  = r * this.pRxF * stretch;
-    const ry  = r * this.pRyF / stretch;
-    const cosD = Math.cos(dir);
-    const sinD = Math.sin(dir);
+    const rx      = r * this.pRxF * stretch;
+    const ry      = r * this.pRyF / stretch;
+    const cosD    = Math.cos(dir);
+    const sinD    = Math.sin(dir);
 
     drawFlagellum(g, this.px, this.py, r, dir, this.pFinPhase, P_MEMBRANE);
-
-    g.fillStyle(P_BODY, 0.11);
-    fillBlob(g, this.px, this.py, rx * 1.40, ry * 1.40, p1, p2, p3, 28, dir);
 
     g.fillStyle(P_BODY, 0.54);
     fillBlob(g, this.px, this.py, rx, ry, p1, p2, p3, 28, dir);
@@ -711,9 +791,9 @@ export class GameScene extends Phaser.Scene {
       g.strokeCircle(vx, vy, v.vr * r);
     }
 
-    const nr  = r * 0.31;
-    const nx  = this.px + (this.pNox * cosD - this.pNoy * sinD) * r * 0.36;
-    const ny  = this.py + (this.pNox * sinD + this.pNoy * cosD) * r * 0.36;
+    const nr = r * 0.31;
+    const nx = this.px + (this.pNox * cosD - this.pNoy * sinD) * r * 0.36;
+    const ny = this.py + (this.pNox * sinD + this.pNoy * cosD) * r * 0.36;
     g.fillStyle(P_NUCLEUS, 0.66);
     fillBlob(g, nx, ny, nr, nr * 0.88, p1 * 0.6, p2 * 0.7, p3 * 0.5);
     g.lineStyle(0.8, P_MEMBRANE, 0.38);

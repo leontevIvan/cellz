@@ -3,6 +3,7 @@ import { CONFIG, WORLD_W, WORLD_H } from '../config/game.config';
 import { Food } from '../entities/Food';
 import type { FoodType } from '../entities/Food';
 import { EnemyCell } from '../entities/EnemyCell';
+import type { CellShape } from '../entities/EnemyCell';
 import { AllyCell }  from '../entities/AllyCell';
 import { fillBlob, strokeBlob, drawFlagellum, drawBioEye, drawMandibles } from '../entities/cellHelpers';
 
@@ -301,15 +302,31 @@ export class GameScene extends Phaser.Scene {
   // ── Enemies ─────────────────────────────────────────────────────────────────
 
   private spawnEnemy(big = false) {
+    let shape: CellShape;
+    let radius: number;
+    let speed: number;
+
+    if (big) {
+      const rng = Math.random();
+      if      (rng < 0.50) { shape = 'blob';  radius = CONFIG.bigEnemy.radius;        speed = CONFIG.bigEnemy.speed; }
+      else if (rng < 0.78) { shape = 'amoeba'; radius = CONFIG.bigEnemy.radius * 0.80; speed = CONFIG.bigEnemy.speed * 0.78; }
+      else                  { shape = 'spiky'; radius = CONFIG.bigEnemy.radius * 0.60; speed = CONFIG.bigEnemy.speed * 1.85; }
+    } else {
+      const rng = Math.random();
+      if      (rng < 0.32) { shape = 'blob';      radius = CONFIG.enemy.radius;        speed = CONFIG.enemy.speed; }
+      else if (rng < 0.58) { shape = 'spiky';     radius = CONFIG.enemy.radius * 0.75; speed = CONFIG.enemy.speed * 1.55; }
+      else if (rng < 0.82) { shape = 'elongated'; radius = CONFIG.enemy.radius;        speed = CONFIG.enemy.speed * 1.50; }
+      else                  { shape = 'amoeba';   radius = CONFIG.enemy.radius * 1.65; speed = CONFIG.enemy.speed * 0.52; }
+    }
+
     const side = Phaser.Math.Between(0, 3);
-    const r    = big ? CONFIG.bigEnemy.radius : CONFIG.enemy.radius;
     let x = 0, y = 0;
-    if      (side === 0) { x = Phaser.Math.Between(r, WORLD_W - r); y = r; }
-    else if (side === 1) { x = WORLD_W - r; y = Phaser.Math.Between(r, WORLD_H - r); }
-    else if (side === 2) { x = Phaser.Math.Between(r, WORLD_W - r); y = WORLD_H - r; }
-    else                 { x = r;           y = Phaser.Math.Between(r, WORLD_H - r); }
-    const spd = big ? CONFIG.bigEnemy.speed : CONFIG.enemy.speed;
-    this.enemies.push(new EnemyCell(this, x, y, spd, r, big));
+    if      (side === 0) { x = Phaser.Math.Between(radius, WORLD_W - radius); y = radius; }
+    else if (side === 1) { x = WORLD_W - radius; y = Phaser.Math.Between(radius, WORLD_H - radius); }
+    else if (side === 2) { x = Phaser.Math.Between(radius, WORLD_W - radius); y = WORLD_H - radius; }
+    else                 { x = radius;            y = Phaser.Math.Between(radius, WORLD_H - radius); }
+
+    this.enemies.push(new EnemyCell(this, x, y, speed, radius, big, shape));
   }
 
   private updateEnemies(delta: number) {

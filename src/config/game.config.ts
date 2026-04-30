@@ -6,7 +6,7 @@ export const WORLD_H     = GAME_HEIGHT * 3;
 export const CONFIG = {
   player: {
     radius: 36,
-    speed: 160,
+    speed: 200,
     maxHp: 220,
   },
   food: {
@@ -18,18 +18,18 @@ export const CONFIG = {
     spawnInterval: 3500,
     count: 18,
     radius: 28,
-    speed: 28,
+    speed: 52,
   },
   bigEnemy: {
     spawnInterval: 14000,
     count: 6,
     radius: 88,
-    speed: 16,
+    speed: 24,
   },
   ally: {
     count: 3,
     radius: 32,
-    speed: 130,
+    speed: 175,
   },
   bubble: {
     count: 22,

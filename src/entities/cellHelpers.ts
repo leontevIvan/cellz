@@ -15,15 +15,13 @@ export function fillBlob(
   g.beginPath();
   for (let i = 0; i <= n; i++) {
     const a = (i / n) * PI2;
-    // traveling waves: some harmonics go clockwise (-p), others counter (+p)
-    // creates the rippling, flowing jellyfish-membrane effect
     const d = 1
-      + 0.17 * Math.sin(a * 2 - p1)           // main wave, travels CW
-      + 0.11 * Math.sin(a * 3 + p2 * 0.8)     // secondary, CCW
-      + 0.08 * Math.cos(a * 4 - p3)           // tertiary CW
-      + 0.05 * Math.sin(a * 5 + p1 * 0.5)     // detail ripple
-      + 0.04 * Math.sin(a      + p2 * 0.3)    // slow asymmetric lean
-      + 0.03 * Math.cos(a * 6 - p3 * 0.6);    // fine fringe
+      + 0.17 * Math.sin(a * 2 - p1)
+      + 0.11 * Math.sin(a * 3 + p2 * 0.8)
+      + 0.08 * Math.cos(a * 4 - p3)
+      + 0.05 * Math.sin(a * 5 + p1 * 0.5)
+      + 0.04 * Math.sin(a      + p2 * 0.3)
+      + 0.03 * Math.cos(a * 6 - p3 * 0.6);
     const bx = Math.cos(a) * rx * d;
     const by = Math.sin(a) * ry * d;
     const x = cx + bx * cosR - by * sinR;
@@ -64,6 +62,126 @@ export function strokeBlob(
   g.strokePath();
 }
 
+/** Spiky cell — 5-fold sharp spines with finer serration between them */
+export function fillSpikyBlob(
+  g: Phaser.GameObjects.Graphics,
+  cx: number, cy: number,
+  rx: number, ry: number,
+  p1: number, p2: number, p3: number,
+  n = 48, rot = 0,
+) {
+  const cosR = Math.cos(rot);
+  const sinR = Math.sin(rot);
+  g.beginPath();
+  for (let i = 0; i <= n; i++) {
+    const a = (i / n) * PI2;
+    const d = 1
+      + 0.40 * Math.sin(a * 5 - p1)           // 5 main spines
+      + 0.18 * Math.sin(a * 8 + p2 * 0.7)     // 8 secondary spines
+      + 0.10 * Math.cos(a * 3 - p3 * 0.8)     // 3-fold asymmetry
+      + 0.06 * Math.sin(a * 11 + p1 * 0.4)    // fine serration
+      + 0.04 * Math.cos(a *  2 + p2 * 0.3);   // slow lean
+    const bx = Math.cos(a) * rx * d;
+    const by = Math.sin(a) * ry * d;
+    const x = cx + bx * cosR - by * sinR;
+    const y = cy + bx * sinR + by * cosR;
+    i === 0 ? g.moveTo(x, y) : g.lineTo(x, y);
+  }
+  g.closePath();
+  g.fillPath();
+}
+
+/** Stroke spiky cell */
+export function strokeSpikyBlob(
+  g: Phaser.GameObjects.Graphics,
+  cx: number, cy: number,
+  rx: number, ry: number,
+  p1: number, p2: number, p3: number,
+  n = 48, rot = 0,
+) {
+  const cosR = Math.cos(rot);
+  const sinR = Math.sin(rot);
+  g.beginPath();
+  for (let i = 0; i <= n; i++) {
+    const a = (i / n) * PI2;
+    const d = 1
+      + 0.40 * Math.sin(a * 5 - p1)
+      + 0.18 * Math.sin(a * 8 + p2 * 0.7)
+      + 0.10 * Math.cos(a * 3 - p3 * 0.8)
+      + 0.06 * Math.sin(a * 11 + p1 * 0.4)
+      + 0.04 * Math.cos(a *  2 + p2 * 0.3);
+    const bx = Math.cos(a) * rx * d;
+    const by = Math.sin(a) * ry * d;
+    const x = cx + bx * cosR - by * sinR;
+    const y = cy + bx * sinR + by * cosR;
+    i === 0 ? g.moveTo(x, y) : g.lineTo(x, y);
+  }
+  g.closePath();
+  g.strokePath();
+}
+
+/** Amoeba — many-lobed pseudopod shape with high-frequency surface texture */
+export function fillAmoeba(
+  g: Phaser.GameObjects.Graphics,
+  cx: number, cy: number,
+  rx: number, ry: number,
+  p1: number, p2: number, p3: number,
+  n = 40, rot = 0,
+) {
+  const cosR = Math.cos(rot);
+  const sinR = Math.sin(rot);
+  g.beginPath();
+  for (let i = 0; i <= n; i++) {
+    const a = (i / n) * PI2;
+    const d = 1
+      + 0.22 * Math.sin(a * 2 - p1)           // primary lobe
+      + 0.18 * Math.sin(a * 3 + p2)           // secondary lobe
+      + 0.14 * Math.cos(a * 4 - p3 * 0.9)    // tertiary lobe
+      + 0.11 * Math.sin(a * 5 + p1 * 0.7)    // fine pseudopods
+      + 0.08 * Math.cos(a * 7 - p2 * 0.5)    // surface bumps
+      + 0.05 * Math.sin(a * 9 + p3 * 0.4)    // micro-bumps
+      + 0.03 * Math.cos(a * 11 - p1 * 0.3);  // surface texture
+    const bx = Math.cos(a) * rx * d;
+    const by = Math.sin(a) * ry * d;
+    const x = cx + bx * cosR - by * sinR;
+    const y = cy + bx * sinR + by * cosR;
+    i === 0 ? g.moveTo(x, y) : g.lineTo(x, y);
+  }
+  g.closePath();
+  g.fillPath();
+}
+
+/** Stroke amoeba */
+export function strokeAmoeba(
+  g: Phaser.GameObjects.Graphics,
+  cx: number, cy: number,
+  rx: number, ry: number,
+  p1: number, p2: number, p3: number,
+  n = 40, rot = 0,
+) {
+  const cosR = Math.cos(rot);
+  const sinR = Math.sin(rot);
+  g.beginPath();
+  for (let i = 0; i <= n; i++) {
+    const a = (i / n) * PI2;
+    const d = 1
+      + 0.22 * Math.sin(a * 2 - p1)
+      + 0.18 * Math.sin(a * 3 + p2)
+      + 0.14 * Math.cos(a * 4 - p3 * 0.9)
+      + 0.11 * Math.sin(a * 5 + p1 * 0.7)
+      + 0.08 * Math.cos(a * 7 - p2 * 0.5)
+      + 0.05 * Math.sin(a * 9 + p3 * 0.4)
+      + 0.03 * Math.cos(a * 11 - p1 * 0.3);
+    const bx = Math.cos(a) * rx * d;
+    const by = Math.sin(a) * ry * d;
+    const x = cx + bx * cosR - by * sinR;
+    const y = cy + bx * sinR + by * cosR;
+    i === 0 ? g.moveTo(x, y) : g.lineTo(x, y);
+  }
+  g.closePath();
+  g.strokePath();
+}
+
 /** Wavy flagellum from the back of the cell */
 export function drawFlagellum(
   g: Phaser.GameObjects.Graphics,
@@ -87,6 +205,66 @@ export function drawFlagellum(
     i === 0 ? g.moveTo(x, y) : g.lineTo(x, y);
   }
   g.strokePath();
+}
+
+/** Two side-by-side flagella for elongated cells */
+export function drawTwinFlagella(
+  g: Phaser.GameObjects.Graphics,
+  cx: number, cy: number,
+  r: number, dir: number,
+  phase: number, color: number,
+) {
+  const perpX = -Math.sin(dir);
+  const perpY =  Math.cos(dir);
+  const spread = r * 0.20;
+
+  for (let s = -1; s <= 1; s += 2) {
+    const bx  = cx - Math.cos(dir) * r * 0.85 + perpX * spread * s;
+    const by  = cy - Math.sin(dir) * r * 0.85 + perpY * spread * s;
+    const len = r * 2.0;
+    const n   = 18;
+    g.lineStyle(1.1, color, 0.42);
+    g.beginPath();
+    for (let i = 0; i <= n; i++) {
+      const t    = i / n;
+      const dist = t * len;
+      const amp  = r * 0.28 * t * Math.max(0, 1 - t * 0.50);
+      const wave = Math.sin(phase * 2.6 - t * Math.PI * 2.8 + s * 0.4) * amp;
+      const x = bx - Math.cos(dir) * dist + Math.sin(dir) * wave;
+      const y = by - Math.sin(dir) * dist - Math.cos(dir) * wave;
+      i === 0 ? g.moveTo(x, y) : g.lineTo(x, y);
+    }
+    g.strokePath();
+  }
+}
+
+/** Short radial pseudopod tendrils for amoeba cells */
+export function drawPseudopods(
+  g: Phaser.GameObjects.Graphics,
+  cx: number, cy: number,
+  r: number,
+  phase: number, color: number,
+) {
+  const count = 6;
+  for (let i = 0; i < count; i++) {
+    const baseAngle = (i / count) * PI2 + phase * 0.18;
+    const len = r * (0.55 + 0.25 * Math.sin(phase * 0.7 + i * 1.3));
+    const n   = 10;
+    g.lineStyle(1.6, color, 0.28);
+    g.beginPath();
+    g.moveTo(cx + Math.cos(baseAngle) * r * 0.88, cy + Math.sin(baseAngle) * r * 0.88);
+    for (let j = 1; j <= n; j++) {
+      const t    = j / n;
+      const dist = t * len;
+      const sway = Math.sin(phase * 1.4 + i * 0.9 + t * Math.PI) * r * 0.10 * t;
+      const a    = baseAngle + sway / (r + 0.01);
+      g.lineTo(
+        cx + Math.cos(baseAngle) * r * 0.88 + Math.cos(a) * dist,
+        cy + Math.sin(baseAngle) * r * 0.88 + Math.sin(a) * dist,
+      );
+    }
+    g.strokePath();
+  }
 }
 
 /** Biological eye: sclera → iris → pupil → glint */
